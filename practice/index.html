@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-<script src="https://unpkg.com/mathlive@0.109.0/dist/mathlive.min.js"></script>
 <style>
 :root {
   --bg: #f0f4ff; --card: #fff; --primary: #6366f1; --primary-light: #e0e7ff;
@@ -100,21 +99,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 .input-toggle button.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow); }
 
 /* MathLive container */
-.mathlive-container { margin-bottom: 12px; }
-.mathlive-container math-field {
+.keyboard-input-area { margin-bottom: 12px; }
+.keyboard-input-area textarea {
   display: block;
   width: 100%;
   min-height: 60px;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   padding: 12px;
   border: 2px solid var(--gray-200);
   border-radius: 8px;
   background: white;
+  font-family: 'Courier New', monospace;
+  resize: vertical;
 }
-.mathlive-container math-field:focus-within { border-color: var(--primary); }
-.math-toolbar { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
-.math-toolbar button { padding: 6px 10px; border: 1px solid var(--gray-200); background: var(--card); border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
-.math-toolbar button:hover { background: var(--primary-light); }
+.keyboard-input-area textarea:focus { border-color: var(--primary); outline: none; }
+.math-shortcuts { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.math-shortcuts button { padding: 6px 10px; border: 1px solid var(--gray-200); background: var(--card); border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+.math-shortcuts button:hover { background: var(--primary-light); }
+.math-preview { padding: 8px 12px; background: var(--gray-100); border-radius: 6px; font-size: 1rem; min-height: 32px; margin-top: 6px; }
+.math-preview .placeholder { color: var(--gray-500); font-style: italic; font-size: 0.85rem; }
+.input-hint { font-size: 0.75rem; color: var(--gray-500); margin-top: 4px; }
 
 /* Canvas */
 .canvas-container { position: relative; margin-bottom: 12px; }
@@ -224,19 +228,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 
       <!-- Keyboard input -->
       <div id="keyboardInput">
-        <div class="math-toolbar">
-          <button onclick="insertMath('\\frac{}{}')">&#189;</button>
-          <button onclick="insertMath('^{}')">x&#178;</button>
-          <button onclick="insertMath('\\sqrt{}')">&#8730;</button>
-          <button onclick="insertMath('\\pi')">&#960;</button>
-          <button onclick="insertMath('\\times')">&#215;</button>
-          <button onclick="insertMath('\\div')">&#247;</button>
-          <button onclick="insertMath('\\pm')">&#177;</button>
-          <button onclick="insertMath('\\leq')">&#8804;</button>
-          <button onclick="insertMath('\\geq')">&#8805;</button>
+        <div class="math-shortcuts">
+          <button onclick="insertText('\\frac{}{}')">&#189;</button>
+          <button onclick="insertText('^{}')">x&#178;</button>
+          <button onclick="insertText('\\sqrt{}')">&#8730;</button>
+          <button onclick="insertText('\\pi')">&#960;</button>
+          <button onclick="insertText('\\times ')">&#215;</button>
+          <button onclick="insertText('\\div ')">&#247;</button>
+          <button onclick="insertText('\\pm ')">&#177;</button>
+          <button onclick="insertText('\\leq ')">&#8804;</button>
+          <button onclick="insertText('\\geq ')">&#8805;</button>
         </div>
-        <div class="mathlive-container">
-          <math-field id="mathField"></math-field>
+        <div class="keyboard-input-area">
+          <textarea id="answerField" placeholder="Type your answer (e.g. 42, x = 5, 2^3 \times 3)" oninput="updatePreview()"></textarea>
+          <div class="math-preview" id="mathPreview"><span class="placeholder">Preview appears here</span></div>
+          <div class="input-hint">Type plain text, numbers, or LaTeX. Examples: 42 &middot; x = 5 &middot; \frac{3}{4} &middot; 2^3 \times 5</div>
         </div>
       </div>
 
@@ -484,8 +490,10 @@ function renderExam() {
   document.getElementById('examNextBtn').style.display = 'none';
 
   // Reset inputs
-  const mf = document.getElementById('mathField');
-  if (mf && mf.setValue) mf.setValue('');
+  const ta = document.getElementById('answerField');
+  if (ta) ta.value = '';
+  const preview = document.getElementById('mathPreview');
+  if (preview) preview.innerHTML = '<span class="placeholder">Preview appears here</span>';
   clearCanvas();
   document.getElementById('recognisedText').textContent = '';
   setInputMode('keyboard');
@@ -503,11 +511,37 @@ function setInputMode(mode) {
   if (mode === 'handwriting') initCanvas();
 }
 
-function insertMath(latex) {
-  const mf = document.getElementById('mathField');
-  if (mf) {
-    mf.insert(latex);
-    mf.focus();
+function insertText(latex) {
+  const ta = document.getElementById('answerField');
+  if (!ta) return;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const val = ta.value;
+  ta.value = val.slice(0, start) + latex + val.slice(end);
+  // Place cursor inside {} if present
+  const bracePos = (val.slice(0, start) + latex).indexOf('{}');
+  if (bracePos >= 0) {
+    ta.selectionStart = ta.selectionEnd = bracePos + 1;
+  } else {
+    ta.selectionStart = ta.selectionEnd = start + latex.length;
+  }
+  ta.focus();
+  updatePreview();
+}
+
+function updatePreview() {
+  const ta = document.getElementById('answerField');
+  const preview = document.getElementById('mathPreview');
+  if (!ta || !preview) return;
+  const val = ta.value.trim();
+  if (!val) {
+    preview.innerHTML = '<span class="placeholder">Preview appears here</span>';
+    return;
+  }
+  try {
+    preview.innerHTML = katex.renderToString(val, { throwOnError: false, displayMode: true });
+  } catch {
+    preview.textContent = val;
   }
 }
 
@@ -519,9 +553,9 @@ async function submitExamAnswer() {
   submitBtn.disabled = true;
 
   if (currentInputMode === 'keyboard') {
-    const mf = document.getElementById('mathField');
-    answer = mf ? mf.getValue('latex') : '';
-    if (!answer.trim()) { alert('Please enter an answer'); submitBtn.disabled = false; return; }
+    const ta = document.getElementById('answerField');
+    answer = ta ? ta.value.trim() : '';
+    if (!answer) { alert('Please enter an answer'); submitBtn.disabled = false; submitBtn.textContent = 'Submit Answer'; return; }
   } else {
     // Auto-recognise handwriting before submitting (tight bounding box crop)
     submitBtn.textContent = 'Recognising handwriting...';
