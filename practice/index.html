@@ -631,7 +631,7 @@ function renderExam() {
         </div>
         <div id="hw_${partId}" style="display:none">
           <div class="canvas-container">
-            <canvas id="cv_${partId}" width="760" height="200" style="height:200px"></canvas>
+            <canvas id="cv_${partId}" style="height:300px"></canvas>
           </div>
           <div class="canvas-actions">
             <button class="btn btn-sm btn-outline" onclick="clearCanvasById('cv_${partId}')">Clear</button>
@@ -704,20 +704,39 @@ function initCanvasById(canvasId) {
   const canvas = document.getElementById(canvasId);
   if (!canvas || canvas.dataset.inited) return;
   canvas.dataset.inited = '1';
-  const ctx = canvas.getContext('2d');
-  canvas.width = canvas.offsetWidth * 2;
-  canvas.height = 400;
-  ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#1e293b';
-  let drawing = false, last = null;
-  canvas.onpointerdown = (e) => { drawing = true; last = getPoint(e, canvas); };
-  canvas.onpointermove = (e) => {
-    if (!drawing) return;
-    const p = getPoint(e, canvas);
-    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-    last = p;
+
+  // Defer init until canvas is visible and has layout
+  const doInit = () => {
+    const w = canvas.offsetWidth || 700;
+    canvas.width = w * 2;
+    canvas.height = 600;
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#1e293b';
+    // White background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let drawing = false, last = null;
+    canvas.onpointerdown = (e) => {
+      e.preventDefault();
+      drawing = true;
+      last = getPoint(e, canvas);
+    };
+    canvas.onpointermove = (e) => {
+      if (!drawing) return;
+      e.preventDefault();
+      const p = getPoint(e, canvas);
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      last = p;
+    };
+    canvas.onpointerup = (e) => { e.preventDefault(); drawing = false; };
+    canvas.onpointerleave = () => { drawing = false; };
+    // Touch events for mobile
+    canvas.ontouchstart = (e) => e.preventDefault();
   };
-  canvas.onpointerup = () => { drawing = false; };
-  canvas.onpointerleave = () => { drawing = false; };
+
+  // Wait for layout
+  requestAnimationFrame(() => requestAnimationFrame(doInit));
 }
 
 function clearCanvasById(canvasId) {
@@ -777,16 +796,22 @@ async function submitPart(partIndex, partId) {
   } else {
     btn.textContent = 'Recognising...';
     const dataUrl = exportCanvasCroppedById(`cv_${partId}`);
-    if (!dataUrl) { alert('Please draw your answer'); btn.disabled = false; btn.textContent = 'Submit'; return; }
+    if (!dataUrl) { alert('Please draw your answer first'); btn.disabled = false; btn.textContent = 'Submit'; return; }
     try {
       const recRes = await fetch(`${API}/api/practice/recognise`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({image_data: dataUrl}),
       });
       const recData = await recRes.json();
-      answer = recData.recognised_text || '[not recognised]';
-      document.getElementById(`rec_${partId}`).textContent = `Recognised: ${answer}`;
+      if (recData.error) {
+        document.getElementById(`rec_${partId}`).textContent = `Recognition error: ${recData.error}`;
+        answer = '[recognition failed]';
+      } else {
+        answer = recData.recognised_text || '[not recognised]';
+        document.getElementById(`rec_${partId}`).textContent = `Recognised: ${answer}`;
+      }
     } catch (e) {
+      document.getElementById(`rec_${partId}`).textContent = `Error: ${e.message}`;
       answer = '[error]';
     }
   }
