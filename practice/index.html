@@ -144,6 +144,27 @@ h1, h2, h3, h4 { font-weight: 600; }
 .math-preview .placeholder { color: var(--muted); font-style: italic; font-size: 0.85rem; }
 .input-hint { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
 
+/* ── Part answer section ──────────────────────── */
+.part-answer-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 12px;
+  background: var(--bg);
+}
+.part-answer-section .part-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+.part-answer-section.submitted { opacity: 0.7; pointer-events: none; }
+.part-answer-section.submitted .part-label::after {
+  content: ' ✓ Submitted';
+  color: var(--success);
+  font-weight: 600;
+}
+
 /* ── Canvas ───────────────────────────────────── */
 .canvas-container { position: relative; margin-bottom: 12px; }
 .canvas-container canvas { width: 100%; height: 400px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: white; cursor: crosshair; touch-action: none; }
@@ -276,48 +297,7 @@ h1, h2, h3, h4 { font-weight: 600; }
     <div class="question-card">
       <div class="q-num" id="examQNum"></div>
       <div class="q-text" id="examQText"></div>
-
-      <div class="input-toggle">
-        <button class="active" onclick="setInputMode('keyboard')">Keyboard</button>
-        <button onclick="setInputMode('handwriting')">Handwriting</button>
-      </div>
-
-      <!-- Keyboard input -->
-      <div id="keyboardInput">
-        <div class="math-shortcuts">
-          <button onclick="insertText('\\frac{}{}')">&#189;</button>
-          <button onclick="insertText('^{}')">x&#178;</button>
-          <button onclick="insertText('\\sqrt{}')">&#8730;</button>
-          <button onclick="insertText('\\pi')">&#960;</button>
-          <button onclick="insertText('\\times ')">&#215;</button>
-          <button onclick="insertText('\\div ')">&#247;</button>
-          <button onclick="insertText('\\pm ')">&#177;</button>
-          <button onclick="insertText('\\leq ')">&#8804;</button>
-          <button onclick="insertText('\\geq ')">&#8805;</button>
-        </div>
-        <div class="keyboard-input-area">
-          <textarea id="answerField" placeholder="Type your answer (e.g. 42, x = 5, 2^3 \times 3)" oninput="updatePreview()"></textarea>
-          <div class="math-preview" id="mathPreview"><span class="placeholder">Preview appears here</span></div>
-          <div class="input-hint">Type plain text, numbers, or LaTeX. Examples: 42 &middot; x = 5 &middot; \frac{3}{4} &middot; 2^3 \times 5</div>
-        </div>
-      </div>
-
-      <!-- Handwriting input -->
-      <div id="handwritingInput" style="display:none">
-        <div class="canvas-container">
-          <canvas id="drawCanvas" width="760" height="200"></canvas>
-        </div>
-        <div class="canvas-actions">
-          <button class="btn btn-sm btn-outline" onclick="clearCanvas()">Clear</button>
-          <button class="btn btn-sm btn-outline" onclick="undoCanvas()">Undo</button>
-        </div>
-        <div id="recognisedText" style="margin-top:8px;font-size:0.85rem;color:var(--gray-500)"></div>
-      </div>
-
-      <div style="text-align:center;margin-top:16px">
-        <button class="btn" onclick="submitExamAnswer()">Submit Answer</button>
-      </div>
-      <div id="examFeedback"></div>
+      <div id="examPartsContainer"></div>
     </div>
     <div style="text-align:center;margin-top:12px">
       <button class="btn" id="examNextBtn" style="display:none" onclick="nextExam()">Next Question</button>
@@ -603,9 +583,12 @@ function renderExam() {
   // Reference image (from first part)
   const imgUrl = meta.exam_id && meta.page_image ? `${API}/images/${meta.exam_id}/${meta.page_image}` : null;
   if (imgUrl) {
-    html += `<div style="margin-bottom:14px;text-align:center">
-      <img src="${imgUrl}" alt="Question reference" style="max-width:100%;max-height:250px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer" onclick="window.open('${imgUrl}','_blank')">
-      <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Click image to enlarge</div>
+    html += `<div style="margin-bottom:14px">
+      <div style="font-size:0.8rem;color:var(--primary);cursor:pointer;font-weight:600" onclick="const img=this.nextElementSibling; img.style.display=img.style.display==='none'?'block':'none'; this.textContent=img.style.display==='none'?'&#9654; Show question image':'&#9660; Hide question image'">&#9654; Show question image</div>
+      <div style="display:none;margin-top:8px;text-align:center">
+        <img src="${imgUrl}" alt="Question reference" style="max-width:100%;max-height:300px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer" onclick="window.open('${imgUrl}','_blank')">
+        <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Click image to enlarge</div>
+      </div>
     </div>`;
   }
 
@@ -618,105 +601,196 @@ function renderExam() {
   }
   document.getElementById('examQText').innerHTML = html;
 
-  // Store current parts for answer submission
-  examQuestions = parts;
+  // Generate per-part answer sections
+  const partsContainer = document.getElementById('examPartsContainer');
+  let partsHtml = '';
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    const partLabel = p.part ? `(${p.part})` : 'Answer';
+    const partId = `part_${i}`;
+    partsHtml += `
+      <div class="part-answer-section" id="section_${partId}">
+        <div class="part-label">${partLabel} <span style="font-weight:400;color:var(--muted)">[${p.marks} mk]</span></div>
+        <div class="input-toggle" style="margin-bottom:8px">
+          <button class="active" onclick="setPartInputMode('${partId}','keyboard')">Keyboard</button>
+          <button onclick="setPartInputMode('${partId}','handwriting')">Handwriting</button>
+        </div>
+        <div id="kb_${partId}">
+          <div class="math-shortcuts">
+            <button onclick="insertTextTo('ta_${partId}','\\\\frac{}{}')">&#189;</button>
+            <button onclick="insertTextTo('ta_${partId}','^{}')">x&#178;</button>
+            <button onclick="insertTextTo('ta_${partId}','\\\\sqrt{}')">&#8730;</button>
+            <button onclick="insertTextTo('ta_${partId}','\\\\pi')">&#960;</button>
+            <button onclick="insertTextTo('ta_${partId}','\\\\times ')">&#215;</button>
+            <button onclick="insertTextTo('ta_${partId}','\\\\div ')">&#247;</button>
+          </div>
+          <div class="keyboard-input-area">
+            <textarea id="ta_${partId}" placeholder="Type your answer" oninput="updatePreviewFor('ta_${partId}','pv_${partId}')"></textarea>
+            <div class="math-preview" id="pv_${partId}"><span class="placeholder">Preview</span></div>
+          </div>
+        </div>
+        <div id="hw_${partId}" style="display:none">
+          <div class="canvas-container">
+            <canvas id="cv_${partId}" width="760" height="200" style="height:200px"></canvas>
+          </div>
+          <div class="canvas-actions">
+            <button class="btn btn-sm btn-outline" onclick="clearCanvasById('cv_${partId}')">Clear</button>
+            <button class="btn btn-sm btn-outline" onclick="undoCanvasById('cv_${partId}')">Undo</button>
+          </div>
+          <div id="rec_${partId}" style="margin-top:6px;font-size:0.8rem;color:var(--muted)"></div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm" id="submitBtn_${partId}" onclick="submitPart(${i},'${partId}')">Submit</button>
+          <div id="fb_${partId}" style="flex:1"></div>
+        </div>
+      </div>
+    `;
+  }
+  partsContainer.innerHTML = partsHtml;
 
-  document.getElementById('examFeedback').innerHTML = '';
+  // Store current parts
+  examQuestions = parts;
+  examPartsSubmitted = 0;
   document.getElementById('examNextBtn').style.display = 'none';
 
-  // Reset inputs
-  const ta = document.getElementById('answerField');
-  if (ta) ta.value = '';
-  const preview = document.getElementById('mathPreview');
-  if (preview) preview.innerHTML = '<span class="placeholder">Preview appears here</span>';
-  clearCanvas();
-  document.getElementById('recognisedText').textContent = '';
-  setInputMode('keyboard');
+  // Init canvases for handwriting
+  for (let i = 0; i < parts.length; i++) {
+    initCanvasById(`cv_part_${i}`);
+  }
 
   renderMath(document.getElementById('examView'));
 }
 
-function setInputMode(mode) {
-  currentInputMode = mode;
-  document.getElementById('keyboardInput').style.display = mode === 'keyboard' ? 'block' : 'none';
-  document.getElementById('handwritingInput').style.display = mode === 'handwriting' ? 'block' : 'none';
-  document.querySelectorAll('.input-toggle button').forEach((b, i) =>
+let examPartsSubmitted = 0;
+
+// ── Per-part input helpers ─────────────────────────────────
+
+function setPartInputMode(partId, mode) {
+  document.getElementById(`kb_${partId}`).style.display = mode === 'keyboard' ? 'block' : 'none';
+  document.getElementById(`hw_${partId}`).style.display = mode === 'handwriting' ? 'block' : 'none';
+  const section = document.getElementById(`section_${partId}`);
+  section.querySelectorAll('.input-toggle button').forEach((b, i) =>
     b.classList.toggle('active', (mode === 'keyboard' ? i === 0 : i === 1))
   );
-  if (mode === 'handwriting') initCanvas();
+  section.dataset.inputMode = mode;
+  if (mode === 'handwriting') initCanvasById(`cv_${partId}`);
 }
 
-function insertText(latex) {
-  const ta = document.getElementById('answerField');
+function insertTextTo(taId, latex) {
+  const ta = document.getElementById(taId);
   if (!ta) return;
   const start = ta.selectionStart;
-  const end = ta.selectionEnd;
   const val = ta.value;
-  ta.value = val.slice(0, start) + latex + val.slice(end);
-  // Place cursor inside {} if present
+  ta.value = val.slice(0, start) + latex + val.slice(ta.selectionEnd);
   const bracePos = (val.slice(0, start) + latex).indexOf('{}');
-  if (bracePos >= 0) {
-    ta.selectionStart = ta.selectionEnd = bracePos + 1;
-  } else {
-    ta.selectionStart = ta.selectionEnd = start + latex.length;
-  }
+  ta.selectionStart = ta.selectionEnd = bracePos >= 0 ? bracePos + 1 : start + latex.length;
   ta.focus();
-  updatePreview();
+  const pvId = taId.replace('ta_', 'pv_');
+  updatePreviewFor(taId, pvId);
 }
 
-function updatePreview() {
-  const ta = document.getElementById('answerField');
-  const preview = document.getElementById('mathPreview');
+function updatePreviewFor(taId, pvId) {
+  const ta = document.getElementById(taId);
+  const preview = document.getElementById(pvId);
   if (!ta || !preview) return;
   const val = ta.value.trim();
-  if (!val) {
-    preview.innerHTML = '<span class="placeholder">Preview appears here</span>';
-    return;
-  }
-  try {
-    preview.innerHTML = katex.renderToString(val, { throwOnError: false, displayMode: true });
-  } catch {
-    preview.textContent = val;
-  }
+  if (!val) { preview.innerHTML = '<span class="placeholder">Preview</span>'; return; }
+  try { preview.innerHTML = katex.renderToString(val, { throwOnError: false, displayMode: false }); }
+  catch { preview.textContent = val; }
 }
 
-async function submitExamAnswer() {
-  // Submit against first part of the group (AI marking considers all parts via stem)
-  const q = examQuestions[0];
+function initCanvasById(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || canvas.dataset.inited) return;
+  canvas.dataset.inited = '1';
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * 2;
+  canvas.height = 400;
+  ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#1e293b';
+  let drawing = false, last = null;
+  canvas.onpointerdown = (e) => { drawing = true; last = getPoint(e, canvas); };
+  canvas.onpointermove = (e) => {
+    if (!drawing) return;
+    const p = getPoint(e, canvas);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p;
+  };
+  canvas.onpointerup = () => { drawing = false; };
+  canvas.onpointerleave = () => { drawing = false; };
+}
+
+function clearCanvasById(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function undoCanvasById(canvasId) {
+  // Simple clear for now
+  clearCanvasById(canvasId);
+}
+
+function exportCanvasCroppedById(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0, hasContent = false;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const i = (y * canvas.width + x) * 4;
+      if (data[i] < 200 || data[i+1] < 200 || data[i+2] < 200) {
+        if (x < minX) minX = x; if (y < minY) minY = y;
+        if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+        hasContent = true;
+      }
+    }
+  }
+  if (!hasContent) return null;
+  const pad = 40;
+  minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+  maxX = Math.min(canvas.width, maxX + pad); maxY = Math.min(canvas.height, maxY + pad);
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = maxX - minX; cropCanvas.height = maxY - minY;
+  const cropCtx = cropCanvas.getContext('2d');
+  cropCtx.fillStyle = 'white'; cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+  cropCtx.drawImage(canvas, minX, minY, cropCanvas.width, cropCanvas.height, 0, 0, cropCanvas.width, cropCanvas.height);
+  return cropCanvas.toDataURL('image/png');
+}
+
+async function submitPart(partIndex, partId) {
+  const q = examQuestions[partIndex];
+  const section = document.getElementById(`section_${partId}`);
+  const mode = section.dataset.inputMode || 'keyboard';
+  const btn = document.getElementById(`submitBtn_${partId}`);
+  const fb = document.getElementById(`fb_${partId}`);
   let answer = '';
 
-  const submitBtn = document.querySelector('#examView .btn:not(#examNextBtn)');
-  submitBtn.disabled = true;
+  btn.disabled = true;
 
-  if (currentInputMode === 'keyboard') {
-    const ta = document.getElementById('answerField');
+  if (mode === 'keyboard') {
+    const ta = document.getElementById(`ta_${partId}`);
     answer = ta ? ta.value.trim() : '';
-    if (!answer) { alert('Please enter an answer'); submitBtn.disabled = false; submitBtn.textContent = 'Submit Answer'; return; }
+    if (!answer) { alert('Please enter an answer'); btn.disabled = false; return; }
   } else {
-    // Auto-recognise handwriting before submitting (tight bounding box crop)
-    submitBtn.textContent = 'Recognising handwriting...';
-    const dataUrl = exportCanvasCropped();
-    if (!dataUrl) { alert('Please draw your answer first'); submitBtn.disabled = false; submitBtn.textContent = 'Submit Answer'; return; }
+    btn.textContent = 'Recognising...';
+    const dataUrl = exportCanvasCroppedById(`cv_${partId}`);
+    if (!dataUrl) { alert('Please draw your answer'); btn.disabled = false; btn.textContent = 'Submit'; return; }
     try {
       const recRes = await fetch(`${API}/api/practice/recognise`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({image_data: dataUrl}),
       });
       const recData = await recRes.json();
-      if (recData.recognised_text) {
-        answer = recData.recognised_text;
-        document.getElementById('recognisedText').textContent = `Recognised: ${answer}`;
-      } else {
-        answer = '[could not recognise handwriting]';
-        document.getElementById('recognisedText').textContent = `Recognition failed: ${recData.error || 'unknown error'}`;
-      }
+      answer = recData.recognised_text || '[not recognised]';
+      document.getElementById(`rec_${partId}`).textContent = `Recognised: ${answer}`;
     } catch (e) {
-      answer = '[recognition error]';
-      document.getElementById('recognisedText').textContent = `Error: ${e.message}`;
+      answer = '[error]';
     }
   }
 
-  submitBtn.textContent = 'Marking...';
+  btn.textContent = 'Marking...';
 
   try {
     const res = await fetch(`${API}/api/practice/check-free`, {
@@ -725,36 +799,31 @@ async function submitExamAnswer() {
         student_id: currentStudent.id,
         exam_question_id: q.id,
         student_answer: answer,
-        input_mode: currentInputMode,
+        input_mode: mode,
       }),
     });
     const result = await res.json();
 
     let feedbackClass, scoreLabel;
-    if (result.is_correct || result.score >= 80) {
-      feedbackClass = 'correct';
-      scoreLabel = 'Correct!';
-    } else if (result.score >= 40) {
-      feedbackClass = 'partial';
-      scoreLabel = 'Partially correct';
-    } else {
-      feedbackClass = 'wrong';
-      scoreLabel = 'Not quite right';
-    }
-    document.getElementById('examFeedback').innerHTML = `
-      <div class="feedback ${feedbackClass}">
-        <strong>${scoreLabel}</strong><br>
-        ${result.feedback}<br><br>
-        <strong>Model answer:</strong> ${result.correct_answer}
-      </div>`;
-    renderMath(document.getElementById('examFeedback'));
-    document.getElementById('examNextBtn').style.display = 'inline-block';
+    if (result.is_correct || result.score >= 80) { feedbackClass = 'correct'; scoreLabel = 'Correct!'; }
+    else if (result.score >= 40) { feedbackClass = 'partial'; scoreLabel = 'Partially correct'; }
+    else { feedbackClass = 'wrong'; scoreLabel = 'Not quite right'; }
+
+    fb.innerHTML = `<div class="feedback ${feedbackClass}" style="margin-top:0">
+      <strong>${scoreLabel}</strong> ${result.feedback}<br>
+      <strong>Answer:</strong> ${result.correct_answer}
+    </div>`;
+    renderMath(fb);
+    section.classList.add('submitted');
   } catch (e) {
-    document.getElementById('examFeedback').innerHTML = `<div class="feedback wrong">Error: ${e.message}</div>`;
+    fb.innerHTML = `<div class="feedback wrong" style="margin-top:0">Error: ${e.message}</div>`;
   }
 
-  submitBtn.textContent = 'Submit Answer';
-  submitBtn.disabled = false;
+  btn.textContent = 'Submitted';
+  examPartsSubmitted++;
+  if (examPartsSubmitted >= examQuestions.length) {
+    document.getElementById('examNextBtn').style.display = 'inline-block';
+  }
 }
 
 function nextExam() {
@@ -768,33 +837,6 @@ function nextExam() {
 
 // ── Canvas (Handwriting) ───────────────────────────────────
 
-function initCanvas() {
-  const canvas = document.getElementById('drawCanvas');
-  const ctx = canvas.getContext('2d');
-  canvas.width = canvas.offsetWidth * 2;
-  canvas.height = 800;
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#1e293b';
-
-  canvas.onpointerdown = (e) => {
-    isDrawing = true;
-    lastPoint = getPoint(e, canvas);
-    saveCanvasState();
-  };
-  canvas.onpointermove = (e) => {
-    if (!isDrawing) return;
-    const p = getPoint(e, canvas);
-    ctx.beginPath();
-    ctx.moveTo(lastPoint.x, lastPoint.y);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-    lastPoint = p;
-  };
-  canvas.onpointerup = () => { isDrawing = false; };
-  canvas.onpointerleave = () => { isDrawing = false; };
-}
-
 function getPoint(e, canvas) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -803,79 +845,7 @@ function getPoint(e, canvas) {
   };
 }
 
-function saveCanvasState() {
-  const canvas = document.getElementById('drawCanvas');
-  canvasHistory.push(canvas.toDataURL());
-  if (canvasHistory.length > 20) canvasHistory.shift();
-}
-
-function clearCanvas() {
-  const canvas = document.getElementById('drawCanvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  canvasHistory = [];
-}
-
-function undoCanvas() {
-  if (canvasHistory.length === 0) return;
-  const canvas = document.getElementById('drawCanvas');
-  const ctx = canvas.getContext('2d');
-  const img = new Image();
-  const data = canvasHistory.pop();
-  img.onload = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0);
-  };
-  img.src = data;
-}
-
-function exportCanvasCropped() {
-  // Export only the drawn area with padding (like math-stylus-support's bounding box approach)
-  const canvas = document.getElementById('drawCanvas');
-  const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  // Find bounding box of drawn content
-  let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
-  let hasContent = false;
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      const i = (y * canvas.width + x) * 4;
-      // Check if pixel is not white (drawn on)
-      if (data[i] < 200 || data[i+1] < 200 || data[i+2] < 200) {
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-        hasContent = true;
-      }
-    }
-  }
-
-  if (!hasContent) return null;
-
-  // Add padding
-  const pad = 40;
-  minX = Math.max(0, minX - pad);
-  minY = Math.max(0, minY - pad);
-  maxX = Math.min(canvas.width, maxX + pad);
-  maxY = Math.min(canvas.height, maxY + pad);
-
-  // Create cropped canvas with white background
-  const cropW = maxX - minX;
-  const cropH = maxY - minY;
-  const cropCanvas = document.createElement('canvas');
-  cropCanvas.width = cropW;
-  cropCanvas.height = cropH;
-  const cropCtx = cropCanvas.getContext('2d');
-  cropCtx.fillStyle = 'white';
-  cropCtx.fillRect(0, 0, cropW, cropH);
-  cropCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
-
-  return cropCanvas.toDataURL('image/png');
-}
+// (old single-canvas functions removed — per-part canvas functions above)
 
 // ── Results ────────────────────────────────────────────────
 
