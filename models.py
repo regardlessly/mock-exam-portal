@@ -5,7 +5,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from pgvector.sqlalchemy import Vector
 
-DATABASE_URL = "postgresql://timmy@localhost:5432/mock_exams"
+import os
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://timmy@localhost:5432/mock_exams")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)

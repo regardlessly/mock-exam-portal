@@ -626,7 +626,7 @@ function renderExam() {
           </div>
           <div class="keyboard-input-area">
             <textarea id="ta_${partId}" placeholder="Type your answer" oninput="updatePreviewFor('ta_${partId}','pv_${partId}')"></textarea>
-            <div class="math-preview" id="pv_${partId}"><span class="placeholder">Preview</span></div>
+            <div class="math-preview" id="pv_${partId}" style="display:none"></div>
           </div>
         </div>
         <div id="hw_${partId}" style="display:none">
@@ -694,7 +694,8 @@ function updatePreviewFor(taId, pvId) {
   const preview = document.getElementById(pvId);
   if (!ta || !preview) return;
   const val = ta.value.trim();
-  if (!val) { preview.innerHTML = '<span class="placeholder">Preview</span>'; return; }
+  if (!val) { preview.style.display = 'none'; preview.innerHTML = ''; return; }
+  preview.style.display = 'block';
   try { preview.innerHTML = katex.renderToString(val, { throwOnError: false, displayMode: false }); }
   catch { preview.textContent = val; }
 }
