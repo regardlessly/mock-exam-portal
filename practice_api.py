@@ -19,6 +19,20 @@ from models import (
 
 router = APIRouter(prefix="/api/practice", tags=["practice"])
 
+# Simple in-memory cache for static data
+_cache = {}
+def cached(key, ttl=300):
+    """Simple cache decorator check. Returns (hit, data)."""
+    import time
+    if key in _cache:
+        ts, data = _cache[key]
+        if time.time() - ts < ttl:
+            return True, data
+    return False, None
+def set_cache(key, data):
+    import time
+    _cache[key] = (time.time(), data)
+
 # Lazy Bedrock client
 _bedrock = None
 
@@ -91,6 +105,10 @@ def list_students(db: Session = Depends(get_db)):
 
 @router.get("/topics")
 def practice_topics(db: Session = Depends(get_db)):
+    hit, data = cached("topics")
+    if hit:
+        return data
+
     topics = db.query(CurriculumTopic).order_by(CurriculumTopic.id).all()
 
     # Single query for MCQ counts
@@ -105,7 +123,7 @@ def practice_topics(db: Session = Depends(get_db)):
         .group_by(Question.topic_id).all()
     )
 
-    return [
+    result = [
         {
             "id": t.id,
             "semester": t.semester,
@@ -116,6 +134,8 @@ def practice_topics(db: Session = Depends(get_db)):
         }
         for t in topics
     ]
+    set_cache("topics", result)
+    return result
 
 
 # ── MCQ Questions ───────────────────────────────────────────
@@ -256,6 +276,9 @@ def get_exam_questions(
 @router.get("/exam/filters")
 def get_exam_filters(db: Session = Depends(get_db)):
     """Get available schools and papers for filtering."""
+    hit, data = cached("exam_filters")
+    if hit:
+        return data
     from models import Paper, Exam
     # Single join query
     rows = (
@@ -274,7 +297,9 @@ def get_exam_filters(db: Session = Depends(get_db)):
                 "year": exam.year, "papers": [],
             }
         exams_map[exam.id]["papers"].append({"id": paper.id, "paper_number": paper.paper_number})
-    return list(exams_map.values())
+    result = list(exams_map.values())
+    set_cache("exam_filters", result)
+    return result
 
 
 @router.post("/check-free")
