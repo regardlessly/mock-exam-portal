@@ -177,10 +177,25 @@ def get_exam_questions(
         query = query.join(Paper, Question.paper_id == Paper.id).join(
             Exam, Paper.exam_id == Exam.id
         ).filter(Exam.school_id == school_id)
-    questions = query.all()
-    if not questions:
+    all_parts = query.order_by(Question.paper_id, Question.question_number, Question.part).all()
+    if not all_parts:
         raise HTTPException(404, "No exam questions found for these filters")
-    questions = random.sample(questions, min(count, len(questions)))
+
+    # Group parts by (paper_id, question_number)
+    from collections import OrderedDict
+    groups = OrderedDict()
+    for q in all_parts:
+        key = (q.paper_id, q.question_number)
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(q)
+
+    # Sample whole groups, not individual parts
+    group_keys = list(groups.keys())
+    sampled_keys = random.sample(group_keys, min(count, len(group_keys)))
+    questions = []
+    for k in sampled_keys:
+        questions.extend(groups[k])
     # Get paper/school info for display
     paper_cache = {}
     for q in questions:
@@ -190,6 +205,7 @@ def get_exam_questions(
             s = db.query(School).filter(School.id == e.school_id).first() if e else None
             paper_cache[q.paper_id] = {
                 "paper_number": p.paper_number if p else None,
+                "exam_id": e.id if e else None,
                 "exam_title": e.title if e else None,
                 "school": s.name if s else None,
             }
@@ -205,6 +221,7 @@ def get_exam_questions(
             "page_image": q.page_image,
             "pdf_page": q.pdf_page,
             "paper_id": q.paper_id,
+            "exam_id": paper_cache.get(q.paper_id, {}).get("exam_id"),
             "paper_number": paper_cache.get(q.paper_id, {}).get("paper_number"),
             "school": paper_cache.get(q.paper_id, {}).get("school"),
             "exam_title": paper_cache.get(q.paper_id, {}).get("exam_title"),

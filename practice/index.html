@@ -559,28 +559,67 @@ async function startExam() {
   else if (schoolId) url += `&school_id=${schoolId}`;
 
   const res = await fetch(url);
-  examQuestions = await res.json();
-  if (examQuestions.length === 0) {
-    alert('No exam questions for this topic yet.');
+  const allParts = await res.json();
+  if (allParts.length === 0) {
+    alert('No exam questions found.');
     return;
+  }
+  // Group parts into questions by (paper_id, question_number)
+  examGroups = [];
+  const seen = {};
+  for (const q of allParts) {
+    const key = `${q.paper_id}_${q.question_number}`;
+    if (!(key in seen)) {
+      seen[key] = examGroups.length;
+      examGroups.push({ parts: [], meta: q });
+    }
+    examGroups[seen[key]].parts.push(q);
   }
   examIndex = 0;
   showView('examView');
   renderExam();
 }
 
+let examGroups = [];
+
 function renderExam() {
-  const q = examQuestions[examIndex];
-  const total = examQuestions.length;
+  const group = examGroups[examIndex];
+  const parts = group.parts;
+  const meta = group.meta;
+  const total = examGroups.length;
+
   document.getElementById('examProgressLabel').textContent = `${examIndex + 1}/${total}`;
   document.getElementById('examProgressFill').style.width = `${(examIndex / total) * 100}%`;
-  const source = q.school ? `${q.school} — Paper ${q.paper_number}` : '';
-  document.getElementById('examQNum').textContent = `Q${q.question_number}${q.part ? '(' + q.part + ')' : ''} [${q.marks} mark${q.marks > 1 ? 's' : ''}]${source ? ' — ' + source : ''}`;
 
-  let text = '';
-  if (q.stem) text += q.stem + '<br><br>';
-  text += q.question_text;
-  document.getElementById('examQText').innerHTML = text;
+  const source = meta.school ? `${meta.school} — Paper ${meta.paper_number}` : '';
+  const totalMarks = parts.reduce((s, p) => s + (p.marks || 0), 0);
+  document.getElementById('examQNum').textContent = `Q${meta.question_number} [${totalMarks} marks]${source ? ' — ' + source : ''}`;
+
+  // Build question text: stem + all parts
+  const stem = parts.find(p => p.stem)?.stem || '';
+  let html = '';
+  if (stem) html += `<div style="margin-bottom:14px">${stem}</div>`;
+
+  // Reference image (from first part)
+  const imgUrl = meta.exam_id && meta.page_image ? `${API}/images/${meta.exam_id}/${meta.page_image}` : null;
+  if (imgUrl) {
+    html += `<div style="margin-bottom:14px;text-align:center">
+      <img src="${imgUrl}" alt="Question reference" style="max-width:100%;max-height:250px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer" onclick="window.open('${imgUrl}','_blank')">
+      <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Click image to enlarge</div>
+    </div>`;
+  }
+
+  if (parts.length === 1 && !parts[0].part) {
+    html += `<div>${parts[0].question_text}</div>`;
+  } else {
+    for (const p of parts) {
+      html += `<div style="margin-bottom:8px"><strong>(${p.part})</strong> ${p.question_text} <span style="color:var(--muted);font-size:0.8rem">[${p.marks} mk]</span></div>`;
+    }
+  }
+  document.getElementById('examQText').innerHTML = html;
+
+  // Store current parts for answer submission
+  examQuestions = parts;
 
   document.getElementById('examFeedback').innerHTML = '';
   document.getElementById('examNextBtn').style.display = 'none';
@@ -642,7 +681,8 @@ function updatePreview() {
 }
 
 async function submitExamAnswer() {
-  const q = examQuestions[examIndex];
+  // Submit against first part of the group (AI marking considers all parts via stem)
+  const q = examQuestions[0];
   let answer = '';
 
   const submitBtn = document.querySelector('#examView .btn:not(#examNextBtn)');
@@ -719,7 +759,7 @@ async function submitExamAnswer() {
 
 function nextExam() {
   examIndex++;
-  if (examIndex >= examQuestions.length) {
+  if (examIndex >= examGroups.length) {
     showView('topicsView');
   } else {
     renderExam();
