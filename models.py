@@ -8,7 +8,7 @@ from pgvector.sqlalchemy import Vector
 import os
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://timmy@localhost:5432/mock_exams")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_size=5, pool_pre_ping=True, pool_recycle=300)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 

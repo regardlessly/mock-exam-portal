@@ -92,23 +92,30 @@ def list_students(db: Session = Depends(get_db)):
 @router.get("/topics")
 def practice_topics(db: Session = Depends(get_db)):
     topics = db.query(CurriculumTopic).order_by(CurriculumTopic.id).all()
-    results = []
-    for t in topics:
-        mcq_count = db.query(func.count(BankQuestion.id)).filter(
-            BankQuestion.topic_id == t.id
-        ).scalar()
-        exam_count = db.query(func.count(Question.id)).filter(
-            Question.topic_id == t.id
-        ).scalar()
-        results.append({
+
+    # Single query for MCQ counts
+    mcq_counts = dict(
+        db.query(BankQuestion.topic_id, func.count(BankQuestion.id))
+        .group_by(BankQuestion.topic_id).all()
+    )
+    # Single query for exam counts
+    exam_counts = dict(
+        db.query(Question.topic_id, func.count(Question.id))
+        .filter(Question.topic_id.isnot(None))
+        .group_by(Question.topic_id).all()
+    )
+
+    return [
+        {
             "id": t.id,
             "semester": t.semester,
             "title": t.title,
             "description": t.description,
-            "mcq_count": mcq_count,
-            "exam_count": exam_count,
-        })
-    return results
+            "mcq_count": mcq_counts.get(t.id, 0),
+            "exam_count": exam_counts.get(t.id, 0),
+        }
+        for t in topics
+    ]
 
 
 # ── MCQ Questions ───────────────────────────────────────────
@@ -211,19 +218,20 @@ def get_exam_questions(
     questions = []
     for k in sampled_keys:
         questions.extend(groups[k])
-    # Get paper/school info for display
-    paper_cache = {}
-    for q in questions:
-        if q.paper_id not in paper_cache:
-            p = db.query(Paper).filter(Paper.id == q.paper_id).first()
-            e = db.query(Exam).filter(Exam.id == p.exam_id).first() if p else None
-            s = db.query(School).filter(School.id == e.school_id).first() if e else None
-            paper_cache[q.paper_id] = {
-                "paper_number": p.paper_number if p else None,
-                "exam_id": e.id if e else None,
-                "exam_title": e.title if e else None,
-                "school": s.name if s else None,
-            }
+
+    # Get paper/school info in ONE join query
+    paper_ids = list(set(q.paper_id for q in questions))
+    paper_rows = (
+        db.query(Paper, Exam, School)
+        .join(Exam, Paper.exam_id == Exam.id)
+        .join(School, Exam.school_id == School.id)
+        .filter(Paper.id.in_(paper_ids))
+        .all()
+    )
+    paper_cache = {
+        p.id: {"paper_number": p.paper_number, "exam_id": e.id, "exam_title": e.title, "school": s.name}
+        for p, e, s in paper_rows
+    }
     return [
         {
             "id": q.id,
@@ -249,20 +257,24 @@ def get_exam_questions(
 def get_exam_filters(db: Session = Depends(get_db)):
     """Get available schools and papers for filtering."""
     from models import Paper, Exam
-    exams = db.query(Exam).order_by(Exam.school_id, Exam.year).all()
-    result = []
-    for e in exams:
-        school = db.query(School).filter(School.id == e.school_id).first()
-        papers = db.query(Paper).filter(Paper.exam_id == e.id).order_by(Paper.paper_number).all()
-        result.append({
-            "exam_id": e.id,
-            "school_id": e.school_id,
-            "school": school.name if school else "Unknown",
-            "title": e.title,
-            "year": e.year,
-            "papers": [{"id": p.id, "paper_number": p.paper_number} for p in papers],
-        })
-    return result
+    # Single join query
+    rows = (
+        db.query(Exam, School, Paper)
+        .join(School, Exam.school_id == School.id)
+        .join(Paper, Paper.exam_id == Exam.id)
+        .order_by(Exam.school_id, Exam.year, Paper.paper_number)
+        .all()
+    )
+    exams_map = {}
+    for exam, school, paper in rows:
+        if exam.id not in exams_map:
+            exams_map[exam.id] = {
+                "exam_id": exam.id, "school_id": school.id,
+                "school": school.name, "title": exam.title,
+                "year": exam.year, "papers": [],
+            }
+        exams_map[exam.id]["papers"].append({"id": paper.id, "paper_number": paper.paper_number})
+    return list(exams_map.values())
 
 
 @router.post("/check-free")
