@@ -122,7 +122,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 
 /* Canvas */
 .canvas-container { position: relative; margin-bottom: 12px; }
-.canvas-container canvas { width: 100%; height: 200px; border: 2px solid var(--gray-200); border-radius: 8px; background: white; cursor: crosshair; touch-action: none; }
+.canvas-container canvas { width: 100%; height: 400px; border: 2px solid var(--gray-200); border-radius: 8px; background: white; cursor: crosshair; touch-action: none; }
 .canvas-actions { display: flex; gap: 8px; margin-top: 8px; }
 
 /* Results */
@@ -140,8 +140,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 .progress-stat { font-size: 0.75rem; color: var(--gray-500); margin-top: 4px; }
 
 /* Nav */
-.nav-back { display: inline-flex; align-items: center; gap: 4px; color: var(--gray-500); font-size: 0.85rem; cursor: pointer; margin-bottom: 12px; background: none; border: none; }
-.nav-back:hover { color: var(--primary); }
+.nav-back { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); font-size: 0.9rem; font-weight: 600; cursor: pointer; margin-bottom: 12px; background: var(--primary-light); border: 1px solid var(--primary); border-radius: 8px; padding: 8px 16px; }
+.nav-back:hover { background: var(--primary); color: white; }
 </style>
 </head>
 <body>
@@ -183,7 +183,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
         <h3>MCQ Practice</h3>
         <p id="mcqCount">0 questions</p>
       </div>
-      <div class="mode-card" onclick="startExam()">
+      <div class="mode-card" onclick="showExamFilters()">
         <div class="icon">&#9998;</div>
         <h3>Exam Practice</h3>
         <p id="examCount">0 questions</p>
@@ -193,7 +193,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 
   <!-- MCQ QUIZ -->
   <div class="view" id="mcqView">
-    <button class="nav-back" onclick="confirmExit()">Exit Quiz</button>
+    <button class="nav-back" onclick="confirmExit()">&#8592; Exit Quiz</button>
     <div class="quiz-progress">
       <span class="label" id="mcqProgressLabel">1/10</span>
       <div class="bar"><div class="fill" id="mcqProgressFill"></div></div>
@@ -210,9 +210,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
     </div>
   </div>
 
+  <!-- EXAM FILTERS -->
+  <div class="view" id="examFilterView">
+    <button class="nav-back" onclick="showView('modeView')">&#8592; Back</button>
+    <h2>Exam Practice — Choose Source</h2>
+    <p style="color:var(--gray-500);font-size:0.85rem;margin-bottom:16px">Filter by school and paper, or practise from all exams.</p>
+    <div class="filter-bar" style="flex-direction:column;align-items:stretch;gap:10px">
+      <div>
+        <label style="font-weight:600;font-size:0.85rem">School</label>
+        <select id="examSchoolFilter" onchange="updatePaperFilter()" style="width:100%;margin-top:4px">
+          <option value="">All Schools</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-weight:600;font-size:0.85rem">Paper</label>
+        <select id="examPaperFilter" style="width:100%;margin-top:4px">
+          <option value="">All Papers</option>
+        </select>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:20px">
+      <button class="btn" onclick="startExam()">Start Practice</button>
+    </div>
+  </div>
+
   <!-- EXAM PRACTICE -->
   <div class="view" id="examView">
-    <button class="nav-back" onclick="confirmExit()">Exit</button>
+    <button class="nav-back" onclick="confirmExit()">&#8592; Exit</button>
     <div class="quiz-progress">
       <span class="label" id="examProgressLabel">1/5</span>
       <div class="bar"><div class="fill" id="examProgressFill"></div></div>
@@ -462,8 +486,47 @@ function nextMCQ() {
 
 // ── Exam Practice ──────────────────────────────────────────
 
+let examFilters = [];
+
+async function showExamFilters() {
+  // Load filter options
+  const res = await fetch(`${API}/api/practice/exam/filters`);
+  examFilters = await res.json();
+
+  const schoolSelect = document.getElementById('examSchoolFilter');
+  const schools = [...new Map(examFilters.map(e => [e.school_id, e.school])).entries()];
+  schoolSelect.innerHTML = '<option value="">All Schools</option>' +
+    schools.map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+
+  updatePaperFilter();
+  showView('examFilterView');
+}
+
+function updatePaperFilter() {
+  const schoolId = document.getElementById('examSchoolFilter').value;
+  const paperSelect = document.getElementById('examPaperFilter');
+  let papers = [];
+
+  const filtered = schoolId ? examFilters.filter(e => e.school_id == schoolId) : examFilters;
+  for (const e of filtered) {
+    for (const p of e.papers) {
+      papers.push({ id: p.id, label: `${e.school} — ${e.year} Paper ${p.paper_number}` });
+    }
+  }
+
+  paperSelect.innerHTML = '<option value="">All Papers</option>' +
+    papers.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+}
+
 async function startExam() {
-  const res = await fetch(`${API}/api/practice/exam?topic_id=${selectedTopic.id}`);
+  let url = `${API}/api/practice/exam?count=5`;
+  if (selectedTopic) url += `&topic_id=${selectedTopic.id}`;
+  const paperId = document.getElementById('examPaperFilter')?.value;
+  const schoolId = document.getElementById('examSchoolFilter')?.value;
+  if (paperId) url += `&paper_id=${paperId}`;
+  else if (schoolId) url += `&school_id=${schoolId}`;
+
+  const res = await fetch(url);
   examQuestions = await res.json();
   if (examQuestions.length === 0) {
     alert('No exam questions for this topic yet.');
@@ -479,7 +542,8 @@ function renderExam() {
   const total = examQuestions.length;
   document.getElementById('examProgressLabel').textContent = `${examIndex + 1}/${total}`;
   document.getElementById('examProgressFill').style.width = `${(examIndex / total) * 100}%`;
-  document.getElementById('examQNum').textContent = `Q${q.question_number}${q.part ? '(' + q.part + ')' : ''} [${q.marks} mark${q.marks > 1 ? 's' : ''}]`;
+  const source = q.school ? `${q.school} — Paper ${q.paper_number}` : '';
+  document.getElementById('examQNum').textContent = `Q${q.question_number}${q.part ? '(' + q.part + ')' : ''} [${q.marks} mark${q.marks > 1 ? 's' : ''}]${source ? ' — ' + source : ''}`;
 
   let text = '';
   if (q.stem) text += q.stem + '<br><br>';
@@ -636,7 +700,7 @@ function initCanvas() {
   const canvas = document.getElementById('drawCanvas');
   const ctx = canvas.getContext('2d');
   canvas.width = canvas.offsetWidth * 2;
-  canvas.height = 400;
+  canvas.height = 800;
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#1e293b';

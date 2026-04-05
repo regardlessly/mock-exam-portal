@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from models import (
     SessionLocal, CurriculumTopic, BankQuestion, Question, Answer,
-    Student, PracticeAttempt,
+    Student, PracticeAttempt, School,
 )
 
 router = APIRouter(prefix="/api/practice", tags=["practice"])
@@ -160,10 +160,39 @@ def check_mcq(req: MCQAnswer, db: Session = Depends(get_db)):
 # ── Exam Questions (free response) ──────────────────────────
 
 @router.get("/exam")
-def get_exam_questions(topic_id: int, db: Session = Depends(get_db)):
-    questions = db.query(Question).filter(Question.topic_id == topic_id).all()
+def get_exam_questions(
+    topic_id: int = None,
+    paper_id: int = None,
+    school_id: int = None,
+    count: int = 5,
+    db: Session = Depends(get_db),
+):
+    from models import Paper, Exam
+    query = db.query(Question)
+    if topic_id:
+        query = query.filter(Question.topic_id == topic_id)
+    if paper_id:
+        query = query.filter(Question.paper_id == paper_id)
+    if school_id:
+        query = query.join(Paper, Question.paper_id == Paper.id).join(
+            Exam, Paper.exam_id == Exam.id
+        ).filter(Exam.school_id == school_id)
+    questions = query.all()
     if not questions:
-        raise HTTPException(404, "No exam questions for this topic")
+        raise HTTPException(404, "No exam questions found for these filters")
+    questions = random.sample(questions, min(count, len(questions)))
+    # Get paper/school info for display
+    paper_cache = {}
+    for q in questions:
+        if q.paper_id not in paper_cache:
+            p = db.query(Paper).filter(Paper.id == q.paper_id).first()
+            e = db.query(Exam).filter(Exam.id == p.exam_id).first() if p else None
+            s = db.query(School).filter(School.id == e.school_id).first() if e else None
+            paper_cache[q.paper_id] = {
+                "paper_number": p.paper_number if p else None,
+                "exam_title": e.title if e else None,
+                "school": s.name if s else None,
+            }
     return [
         {
             "id": q.id,
@@ -176,9 +205,32 @@ def get_exam_questions(topic_id: int, db: Session = Depends(get_db)):
             "page_image": q.page_image,
             "pdf_page": q.pdf_page,
             "paper_id": q.paper_id,
+            "paper_number": paper_cache.get(q.paper_id, {}).get("paper_number"),
+            "school": paper_cache.get(q.paper_id, {}).get("school"),
+            "exam_title": paper_cache.get(q.paper_id, {}).get("exam_title"),
         }
         for q in questions
     ]
+
+
+@router.get("/exam/filters")
+def get_exam_filters(db: Session = Depends(get_db)):
+    """Get available schools and papers for filtering."""
+    from models import Paper, Exam
+    exams = db.query(Exam).order_by(Exam.school_id, Exam.year).all()
+    result = []
+    for e in exams:
+        school = db.query(School).filter(School.id == e.school_id).first()
+        papers = db.query(Paper).filter(Paper.exam_id == e.id).order_by(Paper.paper_number).all()
+        result.append({
+            "exam_id": e.id,
+            "school_id": e.school_id,
+            "school": school.name if school else "Unknown",
+            "title": e.title,
+            "year": e.year,
+            "papers": [{"id": p.id, "paper_number": p.paper_number} for p in papers],
+        })
+    return result
 
 
 @router.post("/check-free")
