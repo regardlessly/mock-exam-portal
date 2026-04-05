@@ -177,9 +177,20 @@ def get_exam_questions(
         query = query.join(Paper, Question.paper_id == Paper.id).join(
             Exam, Paper.exam_id == Exam.id
         ).filter(Exam.school_id == school_id)
-    all_parts = query.order_by(Question.paper_id, Question.question_number, Question.part).all()
-    if not all_parts:
+    matched_parts = query.order_by(Question.paper_id, Question.question_number, Question.part).all()
+    if not matched_parts:
         raise HTTPException(404, "No exam questions found for these filters")
+
+    # Fetch ALL sibling parts for matched questions (so we don't split a/b)
+    sibling_keys = list(set((q.paper_id, q.question_number) for q in matched_parts))
+    from sqlalchemy import or_, and_
+    sibling_filters = [
+        and_(Question.paper_id == pid, Question.question_number == qnum)
+        for pid, qnum in sibling_keys
+    ]
+    all_parts = db.query(Question).filter(
+        or_(*sibling_filters)
+    ).order_by(Question.paper_id, Question.question_number, Question.part).all()
 
     # Group parts by (paper_id, question_number)
     from collections import OrderedDict
