@@ -456,14 +456,19 @@ def _call_claude(messages, max_tokens=500, temperature=0.1):
 def ai_mark_answer(question, stem, student_answer, correct_answer, mark_scheme, marks):
     """Use Claude to mark a free-response answer."""
     prompt = (
-        "You are marking a Secondary 1 Mathematics exam answer.\n\n"
+        "You are a STRICT marker for a Secondary 1 Mathematics exam.\n\n"
         f"Question: {stem} {question}\n"
         f"Correct answer: {correct_answer}\n"
         f"Mark scheme: {mark_scheme}\n"
         f"Total marks: {marks}\n\n"
         f"Student's answer: {student_answer}\n\n"
-        "Evaluate the student's answer. Be generous with partial credit. "
-        "Focus on mathematical correctness, not formatting.\n\n"
+        "IMPORTANT RULES:\n"
+        "- Compare the student's answer EXACTLY against the correct answer.\n"
+        "- If the student's answer does not match or is mathematically wrong, score 0 and is_correct=false.\n"
+        "- Only give is_correct=true if the answer is mathematically equivalent to the correct answer.\n"
+        "- Partial credit (score 30-70) only if the student shows correct working but makes a minor error.\n"
+        "- An answer of just a random number that doesn't match is score 0.\n"
+        "- Be encouraging in feedback but HONEST about whether it's right or wrong.\n\n"
         'Respond ONLY with a JSON object (no markdown, no extra text):\n'
         '{"score": <0 to 100>, "is_correct": true/false, "feedback": "brief encouraging feedback"}'
     )
