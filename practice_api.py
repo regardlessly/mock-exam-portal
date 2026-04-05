@@ -70,6 +70,10 @@ class RecogniseRequest(BaseModel):
 
 @router.post("/students")
 def create_student(req: StudentCreate, db: Session = Depends(get_db)):
+    # Reuse existing student if name matches
+    existing = db.query(Student).filter(Student.name == req.name).first()
+    if existing:
+        return {"id": existing.id, "name": existing.name}
     student = Student(name=req.name)
     db.add(student)
     db.commit()
