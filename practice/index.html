@@ -580,18 +580,6 @@ function renderExam() {
   let html = '';
   if (stem) html += `<div style="margin-bottom:14px">${stem}</div>`;
 
-  // Reference image (from first part)
-  const imgUrl = meta.exam_id && meta.page_image ? `${API}/images/${meta.exam_id}/${meta.page_image}` : null;
-  if (imgUrl) {
-    html += `<div style="margin-bottom:14px">
-      <div style="font-size:0.8rem;color:var(--primary);cursor:pointer;font-weight:600" onclick="const img=this.nextElementSibling; img.style.display=img.style.display==='none'?'block':'none'; this.textContent=img.style.display==='none'?'&#9654; Show question image':'&#9660; Hide question image'">&#9654; Show question image</div>
-      <div style="display:none;margin-top:8px;text-align:center">
-        <img src="${imgUrl}" alt="Question reference" style="max-width:100%;max-height:300px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer" onclick="window.open('${imgUrl}','_blank')">
-        <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Click image to enlarge</div>
-      </div>
-    </div>`;
-  }
-
   if (parts.length === 1 && !parts[0].part) {
     html += `<div>${parts[0].question_text}</div>`;
   } else {
@@ -608,9 +596,16 @@ function renderExam() {
     const p = parts[i];
     const partLabel = p.part ? `(${p.part})` : 'Answer';
     const partId = `part_${i}`;
+    const partImgUrl = p.exam_id && p.page_image ? `${API}/images/${p.exam_id}/${p.page_image}` : null;
     partsHtml += `
       <div class="part-answer-section" id="section_${partId}">
-        <div class="part-label">${partLabel} <span style="font-weight:400;color:var(--muted)">[${p.marks} mk]</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="part-label" style="margin-bottom:0">${partLabel} <span style="font-weight:400;color:var(--muted)">[${p.marks} mk]</span></div>
+          ${partImgUrl ? `<div style="font-size:0.75rem;color:var(--primary);cursor:pointer;font-weight:600" onclick="const d=document.getElementById('img_${partId}'); d.style.display=d.style.display==='none'?'block':'none'; this.textContent=d.style.display==='none'?'Show image':'Hide image'">Show image</div>` : ''}
+        </div>
+        ${partImgUrl ? `<div id="img_${partId}" style="display:none;margin-bottom:10px;text-align:center">
+          <img src="${partImgUrl}" alt="Part ${partLabel}" style="max-width:100%;max-height:200px;border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer" onclick="window.open('${partImgUrl}','_blank')">
+        </div>` : ''}
         <div class="input-toggle" style="margin-bottom:8px">
           <button class="active" onclick="setPartInputMode('${partId}','keyboard')">Keyboard</button>
           <button onclick="setPartInputMode('${partId}','handwriting')">Handwriting</button>
