@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mock Exam Portal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+:root {
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --primary: #2563eb;
+  --primary-light: #dbeafe;
+  --success: #16a34a;
+  --success-light: #dcfce7;
+  --warning: #ea580c;
+  --warning-light: #fff7ed;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-500: #6b7280;
+  --gray-700: #374151;
+  --gray-900: #111827;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--gray-900);
+  line-height: 1.6;
+}
+
+.container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+
+/* ── Header ─────────────────────────────────── */
+header {
+  background: linear-gradient(135deg, #1e40af, #2563eb);
+  color: white;
+  padding: 24px 0;
+  box-shadow: var(--shadow-lg);
+}
+header h1 { font-size: 1.5rem; font-weight: 700; }
+header .subtitle { opacity: 0.85; font-size: 0.9rem; margin-top: 4px; }
+header .nav-row { display: flex; justify-content: space-between; align-items: center; }
+.back-btn {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: none;
+}
+.back-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ── Dashboard ──────────────────────────────── */
+.dashboard { padding: 32px 0; }
+.dashboard h2 { font-size: 1.25rem; margin-bottom: 16px; color: var(--gray-700); }
+
+.upload-zone {
+  border: 2px dashed var(--gray-300);
+  border-radius: var(--radius);
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--card);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 32px;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+.upload-zone .icon { font-size: 2.5rem; margin-bottom: 8px; }
+.upload-zone p { color: var(--gray-500); margin-bottom: 12px; }
+.upload-zone input[type="file"] { display: none; }
+.upload-zone .btn {
+  display: inline-block;
+  background: var(--primary);
+  color: white;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.upload-progress {
+  display: none;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--primary);
+}
+
+.exam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.exam-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: 1px solid var(--gray-200);
+}
+.exam-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.exam-card h3 { font-size: 1rem; margin-bottom: 4px; }
+.exam-card .meta { font-size: 0.8rem; color: var(--gray-500); margin-bottom: 12px; }
+.exam-card .progress-bar {
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.exam-card .progress-fill {
+  height: 100%;
+  background: var(--success);
+  transition: width 0.3s;
+}
+.exam-card .progress-text {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+.status-ready { background: var(--success-light); color: var(--success); }
+.status-processing { background: var(--warning-light); color: var(--warning); }
+
+/* ── Exam Viewer ────────────────────────────── */
+.exam-viewer { display: none; padding: 24px 0; }
+
+.exam-header-info {
+  background: var(--card);
+  padding: 20px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+  border: 1px solid var(--gray-200);
+}
+.exam-header-info h2 { font-size: 1.2rem; }
+.exam-header-info .meta { font-size: 0.85rem; color: var(--gray-500); margin-top: 4px; }
+
+.validation-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-200);
+}
+.validation-summary .progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--gray-200);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.validation-summary .progress-fill {
+  height: 100%;
+  background: var(--success);
+  transition: width 0.3s;
+}
+.validation-summary .count { font-size: 0.85rem; color: var(--gray-500); white-space: nowrap; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: var(--gray-100);
+  padding: 4px;
+  border-radius: 8px;
+  width: fit-content;
+}
+.tab-btn {
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  transition: all 0.15s;
+}
+.tab-btn.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow); }
+
+.toggle-all-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--gray-300);
+  background: var(--card);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--gray-700);
+  margin-bottom: 16px;
+}
+.toggle-all-btn:hover { background: var(--gray-100); }
+
+/* Question cards */
+.question-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+}
+.question-card.validated { border-left: 4px solid var(--success); }
+
+.q-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+}
+.q-header-left { display: flex; align-items: center; gap: 10px; }
+.q-number { font-weight: 700; font-size: 0.95rem; }
+.q-marks {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.q-topic {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  background: var(--gray-200);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.q-validate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  cursor: pointer;
+  user-select: none;
+}
+.q-validate input { cursor: pointer; width: 16px; height: 16px; }
+.q-validate.checked { color: var(--success); font-weight: 600; }
+
+.q-body {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: 20px;
+  padding: 20px;
+}
+@media (max-width: 768px) {
+  .q-body { grid-template-columns: 1fr; }
+}
+
+.q-text { font-size: 0.95rem; line-height: 1.8; }
+.q-text .katex-display { margin: 12px 0; }
+
+.q-image-thumb {
+  cursor: pointer;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+  height: fit-content;
+  transition: box-shadow 0.15s;
+}
+.q-image-thumb:hover { box-shadow: var(--shadow-lg); }
+.q-image-thumb img { width: 100%; display: block; }
+.q-image-thumb .label {
+  text-align: center;
+  padding: 4px;
+  font-size: 0.7rem;
+  color: var(--gray-500);
+  background: var(--gray-100);
+}
+
+/* ── Grouped question ────────────── */
+.question-group {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+}
+.question-group.all-validated { border-left: 4px solid var(--success); }
+
+.qg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+}
+.qg-header-left { display: flex; align-items: center; gap: 10px; }
+.qg-total-marks {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.qg-topics {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.qg-stem {
+  padding: 14px 20px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--card);
+}
+
+.part-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.part-item:last-of-type { border-bottom: none; }
+
+.part-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.part-header-left { display: flex; align-items: center; gap: 8px; }
+.part-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--primary);
+  min-width: 28px;
+}
+.part-marks {
+  font-size: 0.7rem;
+  color: var(--gray-500);
+  background: var(--gray-200);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.part-body {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .part-body { grid-template-columns: 1fr; }
+}
+
+.part-answer-toggle {
+  padding: 8px 20px 8px 28px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--primary);
+  font-weight: 500;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.part-answer-toggle:hover { background: var(--primary-light); }
+.part-answer-toggle .arrow { transition: transform 0.2s; font-size: 0.7rem; }
+.part-answer-toggle.open .arrow { transform: rotate(90deg); }
+
+.part-answer {
+  display: none;
+  padding: 10px 20px 10px 28px;
+  background: #fafbfc;
+}
+.part-answer.open { display: block; }
+
+/* Answer section */
+.q-answer-toggle {
+  padding: 10px 20px;
+  border-top: 1px solid var(--gray-200);
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--primary);
+  font-weight: 500;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.q-answer-toggle:hover { background: var(--primary-light); }
+.q-answer-toggle .arrow { transition: transform 0.2s; }
+.q-answer-toggle.open .arrow { transform: rotate(90deg); }
+
+.q-answer {
+  display: none;
+  padding: 16px 20px;
+  background: #fafbfc;
+  border-top: 1px solid var(--gray-200);
+}
+.q-answer.open { display: block; }
+.q-answer .answer-content { font-size: 0.9rem; line-height: 1.8; }
+.q-answer .mark-scheme,
+.part-answer .mark-scheme {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--gray-300);
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+.q-answer .mark-scheme .mark-tag,
+.part-answer .mark-scheme .mark-tag {
+  display: inline-block;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: 4px;
+}
+
+/* Image modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+.modal-content {
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+  background: white;
+  border-radius: var(--radius);
+  position: relative;
+}
+.modal-content img { width: 100%; display: block; }
+.modal-close {
+  position: absolute;
+  top: 10px; right: 10px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Topic filter ────────────── */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filter-bar select {
+  padding: 6px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: var(--card);
+}
+.filter-bar label {
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+/* ── Nav tabs (dashboard level) ── */
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: var(--gray-100);
+  padding: 4px;
+  border-radius: 8px;
+  width: fit-content;
+}
+.nav-tab {
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  transition: all 0.15s;
+}
+.nav-tab.active { background: var(--card); color: var(--primary); box-shadow: var(--shadow); }
+
+/* ── Question Bank ───────────── */
+.bank-view { display: none; padding: 24px 0; }
+
+.bank-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.bank-card .bank-q { font-size: 0.95rem; margin-bottom: 10px; line-height: 1.6; }
+.bank-opts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.bank-opt {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+}
+.bank-opt.correct {
+  background: var(--success-light);
+  border-color: var(--success);
+  font-weight: 600;
+}
+.bank-explain {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  padding-top: 8px;
+  border-top: 1px dashed var(--gray-300);
+  display: none;
+}
+.bank-explain.open { display: block; }
+.bank-toggle {
+  font-size: 0.8rem;
+  color: var(--primary);
+  cursor: pointer;
+  margin-top: 6px;
+}
+.bank-topic-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--primary-light);
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+.bank-pagination {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.bank-pagination button {
+  padding: 6px 14px;
+  border: 1px solid var(--gray-300);
+  background: var(--card);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.bank-pagination button:disabled { opacity: 0.5; cursor: default; }
+.bank-pagination button.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* ── Empty state ─────────────── */
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--gray-500);
+}
+.empty-state .icon { font-size: 2rem; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container nav-row">
+    <div>
+      <h1>Mock Exam Portal</h1>
+      <div class="subtitle" id="headerSubtitle">Upload and validate digitised mock exams</div>
+    </div>
+    <button class="back-btn" id="backBtn" onclick="showDashboard()">Back to Dashboard</button>
+  </div>
+</header>
+
+<!-- ── Dashboard View ──────────────────────── -->
+<div class="dashboard container" id="dashboardView">
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchMainTab('exams')">Exams</button>
+    <button class="nav-tab" onclick="switchMainTab('bank')">Question Bank</button>
+  </div>
+
+  <div id="examsSection">
+    <div class="upload-zone" id="uploadZone">
+      <div class="icon">&#128196;</div>
+      <p>Drag & drop a mock exam PDF here, or click to select</p>
+      <label class="btn">
+        Choose PDF
+        <input type="file" id="fileInput" accept=".pdf">
+      </label>
+      <div class="upload-progress" id="uploadProgress">Uploading and processing...</div>
+    </div>
+    <h2>Uploaded Exams</h2>
+    <div class="exam-grid" id="examGrid"></div>
+  </div>
+
+  <div id="bankSection" style="display:none">
+    <div class="filter-bar">
+      <label>Topic:</label>
+      <select id="bankTopicFilter" onchange="loadBankQuestions()">
+        <option value="">All Topics</option>
+      </select>
+      <label>Showing <span id="bankCount">0</span> questions</label>
+    </div>
+    <div id="bankContainer"></div>
+    <div class="bank-pagination" id="bankPagination"></div>
+  </div>
+</div>
+
+<!-- ── Exam Viewer ─────────────────────────── -->
+<div class="exam-viewer container" id="examViewer">
+  <div class="exam-header-info" id="examHeaderInfo"></div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+    <div class="tabs" id="tabsBar" style="margin-bottom:0"></div>
+    <div class="filter-bar" style="margin-bottom:0">
+      <label>Filter topic:</label>
+      <select id="examTopicFilter" onchange="filterExamByTopic()">
+        <option value="">All</option>
+      </select>
+    </div>
+    <button class="toggle-all-btn" onclick="toggleAllAnswers()" style="margin-bottom:0">Show All Answers</button>
+  </div>
+  <div id="questionsContainer"></div>
+</div>
+
+<!-- ── Image Modal ─────────────────────────── -->
+<div class="modal-overlay" id="imageModal" onclick="closeModal(event)">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <img id="modalImage" src="" alt="PDF Page">
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let currentExam = null;
+let currentPaperId = null;
+let allAnswersShown = false;
+
+// ── Dashboard ──────────────────────────────────────────────
+
+async function loadExams() {
+  const res = await fetch(`${API}/api/exams`);
+  const exams = await res.json();
+  const grid = document.getElementById('examGrid');
+  if (exams.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><p>No exams uploaded yet. Upload a PDF to get started.</p></div>';
+    return;
+  }
+  grid.innerHTML = exams.map(e => {
+    const pct = e.total_questions > 0 ? Math.round(e.validated_questions / e.total_questions * 100) : 0;
+    return `
+      <div class="exam-card" onclick="viewExam(${e.id})">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <h3>${escHtml(e.school || 'Unknown School')}</h3>
+          <span class="status-badge status-${e.status}">${e.status}</span>
+        </div>
+        <div class="meta">${escHtml(e.title)} &middot; ${e.year || ''} &middot; ${escHtml(e.level || '')} &middot; ${escHtml(e.subject || '')}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-text">${e.validated_questions}/${e.total_questions} questions validated (${pct}%)</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── Upload ─────────────────────────────────────────────────
+
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const uploadProgress = document.getElementById('uploadProgress');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.toLowerCase().endsWith('.pdf')) uploadFile(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) uploadFile(fileInput.files[0]);
+});
+
+async function uploadFile(file) {
+  uploadProgress.style.display = 'block';
+  uploadProgress.textContent = `Uploading ${file.name}...`;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch(`${API}/api/exams/upload`, { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Upload failed');
+    uploadProgress.textContent = `Processed! ${data.page_count} pages extracted.`;
+    setTimeout(() => {
+      uploadProgress.style.display = 'none';
+      loadExams();
+    }, 2000);
+  } catch (err) {
+    uploadProgress.textContent = `Error: ${err.message}`;
+    uploadProgress.style.color = 'red';
+  }
+}
+
+// ── Exam Viewer ────────────────────────────────────────────
+
+async function viewExam(examId) {
+  const res = await fetch(`${API}/api/exams/${examId}`);
+  currentExam = await res.json();
+  document.getElementById('dashboardView').style.display = 'none';
+  document.getElementById('examViewer').style.display = 'block';
+  document.getElementById('backBtn').style.display = 'inline-block';
+  document.getElementById('headerSubtitle').textContent = `${currentExam.school} — ${currentExam.title}`;
+
+  // Header info
+  const info = document.getElementById('examHeaderInfo');
+  info.innerHTML = `
+    <h2>${escHtml(currentExam.school || '')}</h2>
+    <div class="meta">${escHtml(currentExam.title)} &middot; ${currentExam.year || ''} &middot; ${escHtml(currentExam.level || '')} &middot; ${escHtml(currentExam.subject || '')}</div>
+    <div class="validation-summary" id="validationSummary"></div>
+  `;
+
+  // Tabs
+  const tabsBar = document.getElementById('tabsBar');
+  tabsBar.innerHTML = currentExam.papers.map(p =>
+    `<button class="tab-btn" data-paper="${p.id}" onclick="loadPaper(${p.id})">Paper ${p.paper_number}</button>`
+  ).join('');
+
+  if (currentExam.papers.length > 0) {
+    loadPaper(currentExam.papers[0].id);
+  }
+}
+
+async function loadPaper(paperId) {
+  currentPaperId = paperId;
+  // Update tabs
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.paper) === paperId));
+
+  const res = await fetch(`${API}/api/papers/${paperId}/questions`);
+  const questions = await res.json();
+  populateExamTopicFilter(questions);
+  renderExamQuestions(questions);
+}
+
+function renderExamQuestions(questions) {
+  const container = document.getElementById('questionsContainer');
+
+  // Group questions by number for display
+  const grouped = {};
+  questions.forEach(q => {
+    if (!grouped[q.question_number]) grouped[q.question_number] = [];
+    grouped[q.question_number].push(q);
+  });
+
+  let html = '';
+  for (const [num, parts] of Object.entries(grouped)) {
+    const totalMarks = parts.reduce((s, q) => s + (q.marks || 0), 0);
+    const topics = [...new Set(parts.map(q => q.topic).filter(Boolean))];
+    const allValidated = parts.every(q => q.is_validated);
+    const validClass = allValidated ? 'all-validated' : '';
+
+    if (parts.length === 1 && !parts[0].part) {
+      // Single question, no sub-parts — render flat card
+      const q = parts[0];
+      const imgUrl = `${API}/images/${currentExam.id}/${q.page_image}`;
+      const answer = q.answers && q.answers.length > 0 ? q.answers[0] : null;
+      html += renderFlatCard(num, q, imgUrl, answer);
+    } else {
+      // Multi-part question — render grouped card
+      const stem = parts.find(p => p.stem)?.stem || null;
+      html += `<div class="question-group ${validClass}" id="qgroup-${num}">`;
+      html += `
+        <div class="qg-header">
+          <div class="qg-header-left">
+            <span class="q-number">Q${num}</span>
+            <span class="qg-total-marks">${totalMarks} mark${totalMarks > 1 ? 's' : ''}</span>
+            <div class="qg-topics">${topics.map(t => `<span class="q-topic">${escHtml(t)}</span>`).join('')}</div>
+          </div>
+        </div>
+        ${stem ? `<div class="qg-stem">${stem}</div>` : ''}
+      `;
+
+      for (const q of parts) {
+        const partLabel = q.part || '';
+        const imgUrl = `${API}/images/${currentExam.id}/${q.page_image}`;
+        const answer = q.answers && q.answers.length > 0 ? q.answers[0] : null;
+        const checkedClass = q.is_validated ? 'checked' : '';
+        const checkedAttr = q.is_validated ? 'checked' : '';
+
+        html += `
+          <div class="part-item" id="qcard-${q.id}">
+            <div class="part-header">
+              <div class="part-header-left">
+                <span class="part-label">(${escHtml(partLabel)})</span>
+                <span class="part-marks">${q.marks} mk</span>
+              </div>
+              <label class="q-validate ${checkedClass}" id="qval-${q.id}">
+                <input type="checkbox" ${checkedAttr} onchange="toggleValidation(${q.id})">
+                <span>${q.is_validated ? 'Validated' : 'Validate'}</span>
+              </label>
+            </div>
+            <div class="part-body">
+              <div class="q-text" id="qtext-${q.id}">${q.question_text}</div>
+              <div class="q-image-thumb" onclick="openModal('${imgUrl}')">
+                <img src="${imgUrl}" alt="Page ${q.pdf_page}" loading="lazy">
+                <div class="label">Page ${q.pdf_page}</div>
+              </div>
+            </div>
+            ${answer ? `
+              <div class="part-answer-toggle" onclick="toggleAnswer(this)">
+                <span class="arrow">&#9654;</span> Answer
+              </div>
+              <div class="part-answer" id="qans-${q.id}">
+                <div class="answer-content">${answer.answer_text}</div>
+                ${answer.mark_scheme ? `
+                  <div class="mark-scheme">
+                    ${answer.mark_scheme.split(',').map(m => `<span class="mark-tag">${escHtml(m.trim())}</span>`).join(' ')}
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+      html += `</div>`;
+    }
+  }
+
+  function renderFlatCard(num, q, imgUrl, answer) {
+    const validatedClass = q.is_validated ? 'validated' : '';
+    const checkedClass = q.is_validated ? 'checked' : '';
+    const checkedAttr = q.is_validated ? 'checked' : '';
+    return `
+      <div class="question-card ${validatedClass}" id="qcard-${q.id}">
+        <div class="q-header">
+          <div class="q-header-left">
+            <span class="q-number">Q${num}</span>
+            <span class="q-marks">${q.marks} mark${q.marks > 1 ? 's' : ''}</span>
+            ${q.topic ? `<span class="q-topic">${escHtml(q.topic)}</span>` : ''}
+          </div>
+          <label class="q-validate ${checkedClass}" id="qval-${q.id}">
+            <input type="checkbox" ${checkedAttr} onchange="toggleValidation(${q.id})">
+            <span>${q.is_validated ? 'Validated' : 'Validate'}</span>
+          </label>
+        </div>
+        <div class="q-body">
+          <div class="q-text">${q.question_text}</div>
+          <div class="q-image-thumb" onclick="openModal('${imgUrl}')">
+            <img src="${imgUrl}" alt="Page ${q.pdf_page}" loading="lazy">
+            <div class="label">Page ${q.pdf_page}</div>
+          </div>
+        </div>
+        ${answer ? `
+          <div class="q-answer-toggle" onclick="toggleAnswer(this)">
+            <span class="arrow">&#9654;</span> Show Answer
+          </div>
+          <div class="q-answer" id="qans-${q.id}">
+            <div class="answer-content">${answer.answer_text}</div>
+            ${answer.mark_scheme ? `
+              <div class="mark-scheme">
+                ${answer.mark_scheme.split(',').map(m => `<span class="mark-tag">${escHtml(m.trim())}</span>`).join(' ')}
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+  renderAllMath();
+  updateValidationSummary(questions);
+  allAnswersShown = false;
+  document.querySelector('.toggle-all-btn').textContent = 'Show All Answers';
+}
+
+function renderAllMath() {
+  renderMathInElement(document.getElementById('questionsContainer'), {
+    delimiters: [
+      {left: '$$', right: '$$', display: true},
+      {left: '$', right: '$', display: false},
+    ],
+    throwOnError: false,
+  });
+}
+
+function updateValidationSummary(questions) {
+  const total = questions.length;
+  const validated = questions.filter(q => q.is_validated).length;
+  const pct = total > 0 ? Math.round(validated / total * 100) : 0;
+  document.getElementById('validationSummary').innerHTML = `
+    <span class="count">${validated}/${total} validated</span>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <span class="count">${pct}%</span>
+  `;
+}
+
+async function toggleValidation(questionId) {
+  const res = await fetch(`${API}/api/questions/${questionId}/validate`, { method: 'PATCH' });
+  const data = await res.json();
+  const card = document.getElementById(`qcard-${questionId}`);
+  const label = document.getElementById(`qval-${questionId}`);
+  if (data.is_validated) {
+    card.classList.add('validated');
+    label.classList.add('checked');
+    label.querySelector('span').textContent = 'Validated';
+  } else {
+    card.classList.remove('validated');
+    label.classList.remove('checked');
+    label.querySelector('span').textContent = 'Validate';
+  }
+  // Refresh summary
+  if (currentPaperId) {
+    const res2 = await fetch(`${API}/api/papers/${currentPaperId}/questions`);
+    const questions = await res2.json();
+    updateValidationSummary(questions);
+  }
+}
+
+function toggleAnswer(el) {
+  el.classList.toggle('open');
+  const answerDiv = el.nextElementSibling;
+  answerDiv.classList.toggle('open');
+}
+
+function toggleAllAnswers() {
+  allAnswersShown = !allAnswersShown;
+  document.querySelectorAll('.q-answer-toggle, .part-answer-toggle').forEach(el => {
+    if (allAnswersShown) {
+      el.classList.add('open');
+      el.nextElementSibling.classList.add('open');
+    } else {
+      el.classList.remove('open');
+      el.nextElementSibling.classList.remove('open');
+    }
+  });
+  document.querySelector('.toggle-all-btn').textContent = allAnswersShown ? 'Hide All Answers' : 'Show All Answers';
+}
+
+// ── Modal ──────────────────────────────────────────────────
+
+function openModal(imgUrl) {
+  document.getElementById('modalImage').src = imgUrl;
+  document.getElementById('imageModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('imageModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── Navigation ─────────────────────────────────────────────
+
+function showDashboard() {
+  document.getElementById('dashboardView').style.display = 'block';
+  document.getElementById('examViewer').style.display = 'none';
+  document.getElementById('backBtn').style.display = 'none';
+  document.getElementById('headerSubtitle').textContent = 'Upload and validate digitised mock exams';
+  currentExam = null;
+  currentPaperId = null;
+  loadExams();
+}
+
+// ── Util ───────────────────────────────────────────────────
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── Main tabs (Exams / Question Bank) ──────────────────────
+
+let curriculumTopics = [];
+
+async function loadCurriculum() {
+  const res = await fetch(`${API}/api/curriculum/topics`);
+  curriculumTopics = await res.json();
+  // Populate bank topic filter
+  const sel = document.getElementById('bankTopicFilter');
+  sel.innerHTML = '<option value="">All Topics</option>' +
+    curriculumTopics.map(t => `<option value="${t.id}">Topic ${t.id}: ${escHtml(t.title)} (${t.question_count})</option>`).join('');
+}
+
+function switchMainTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach((b, i) => b.classList.toggle('active', (tab === 'exams' ? i === 0 : i === 1)));
+  document.getElementById('examsSection').style.display = tab === 'exams' ? 'block' : 'none';
+  document.getElementById('bankSection').style.display = tab === 'bank' ? 'block' : 'none';
+  if (tab === 'bank') loadBankQuestions();
+}
+
+// ── Question Bank ──────────────────────────────────────────
+
+let bankOffset = 0;
+const BANK_LIMIT = 20;
+
+async function loadBankQuestions(offset = 0) {
+  bankOffset = offset;
+  const topicId = document.getElementById('bankTopicFilter').value;
+  let url = `${API}/api/curriculum/questions?limit=${BANK_LIMIT}&offset=${offset}`;
+  if (topicId) url += `&topic_id=${topicId}`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  document.getElementById('bankCount').textContent = data.total;
+
+  const container = document.getElementById('bankContainer');
+  if (data.questions.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No questions found.</p></div>';
+    document.getElementById('bankPagination').innerHTML = '';
+    return;
+  }
+
+  const topicMap = {};
+  curriculumTopics.forEach(t => topicMap[t.id] = t.title);
+  const LABELS = ['A', 'B', 'C', 'D'];
+
+  container.innerHTML = data.questions.map(q => `
+    <div class="bank-card">
+      <span class="bank-topic-badge">Topic ${q.topic_id}: ${escHtml(topicMap[q.topic_id] || '')}</span>
+      <div class="bank-q"><strong>${q.question_number}.</strong> ${q.question_text}</div>
+      <div class="bank-opts">
+        ${q.options.map((o, i) => `<div class="bank-opt ${i === q.correct_answer ? 'correct' : ''}">${LABELS[i]}) ${escHtml(o)}</div>`).join('')}
+      </div>
+      <div class="bank-toggle" onclick="this.nextElementSibling.classList.toggle('open'); this.textContent = this.nextElementSibling.classList.contains('open') ? 'Hide explanation' : 'Show explanation'">Show explanation</div>
+      <div class="bank-explain">${escHtml(q.explanation)}</div>
+    </div>
+  `).join('');
+
+  // Pagination
+  const totalPages = Math.ceil(data.total / BANK_LIMIT);
+  const currentPage = Math.floor(offset / BANK_LIMIT);
+  let pagHtml = '';
+  pagHtml += `<button ${currentPage === 0 ? 'disabled' : ''} onclick="loadBankQuestions(${(currentPage - 1) * BANK_LIMIT})">Prev</button>`;
+  const startPage = Math.max(0, currentPage - 2);
+  const endPage = Math.min(totalPages, startPage + 5);
+  for (let p = startPage; p < endPage; p++) {
+    pagHtml += `<button class="${p === currentPage ? 'active' : ''}" onclick="loadBankQuestions(${p * BANK_LIMIT})">${p + 1}</button>`;
+  }
+  pagHtml += `<button ${currentPage >= totalPages - 1 ? 'disabled' : ''} onclick="loadBankQuestions(${(currentPage + 1) * BANK_LIMIT})">Next</button>`;
+  document.getElementById('bankPagination').innerHTML = pagHtml;
+}
+
+// ── Exam topic filter ──────────────────────────────────────
+
+let allExamQuestions = [];
+
+function populateExamTopicFilter(questions) {
+  allExamQuestions = questions;
+  const topics = [...new Set(questions.map(q => q.topic).filter(Boolean))];
+  const sel = document.getElementById('examTopicFilter');
+  sel.innerHTML = '<option value="">All</option>' +
+    topics.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+}
+
+function filterExamByTopic() {
+  const topic = document.getElementById('examTopicFilter').value;
+  const filtered = topic ? allExamQuestions.filter(q => q.topic === topic) : allExamQuestions;
+  renderExamQuestions(filtered);
+}
+
+// ── Init ───────────────────────────────────────────────────
+loadExams();
+loadCurriculum();
+</script>
+</body>
+</html>
