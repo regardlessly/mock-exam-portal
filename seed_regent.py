@@ -378,20 +378,20 @@ Total time $= 1.5 + 1 = 2.5$ h""",
     # P2 Q5 — Page 16 (idx 15)
     add_q(db, p2.id, exam_dir, 2, 5, "a",
         r"the value of the cube root of $A$.",
-        1, "Cube Root from Prime Factors", 16, (15, 0.42, 0.60),
+        1, "Cube Root from Prime Factors", 17, (16, 0.44, 0.65),
         r"$\sqrt[3]{A} = \sqrt[3]{2^3 \times 5^3} = 2 \times 5 = 10$", "B1",
         stem=r"When written as product of their prime factors, $A = 2^3 \times 5^3$, $B = 2 \times 3 \times 5 \times 7$, $C = 2^2 \times 5^3 \times 7^2$. Find:",
         topic_id=1)
 
     add_q(db, p2.id, exam_dir, 2, 5, "b",
         r"the greatest number that will divide $A$, $B$ and $C$ exactly.",
-        2, "HCF", 16, (15, 0.60, 0.78),
+        2, "HCF", 17, (16, 0.64, 0.79),
         r"HCF of $A$, $B$, $C = 2 \times 5 = 10$", "M1, A1",
         topic_id=1)
 
     add_q(db, p2.id, exam_dir, 2, 5, "c",
         r"the lowest common multiple of $A$, $B$ and $C$.",
-        2, "LCM", 16, (15, 0.78, 0.95),
+        2, "LCM", 17, (16, 0.77, 0.95),
         r"LCM $= 2^3 \times 3 \times 5^3 \times 7^2 = 147\,000$", "M1, A1",
         topic_id=1)
 
