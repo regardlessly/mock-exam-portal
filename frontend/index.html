@@ -609,6 +609,13 @@ header .nav-row { display: flex; justify-content: space-between; align-items: ce
 
 <!-- ── Dashboard View ──────────────────────── -->
 <div class="dashboard container" id="dashboardView">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <span style="font-size:0.9rem;color:var(--gray-700);font-weight:600">Subject:</span>
+    <div class="nav-tabs" style="margin-bottom:0">
+      <button class="nav-tab active" id="subjMathBtn" onclick="setPortalSubject('Mathematics')">Mathematics</button>
+      <button class="nav-tab" id="subjSciBtn" onclick="setPortalSubject('Science')">Science</button>
+    </div>
+  </div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="switchMainTab('exams')">Exams</button>
     <button class="nav-tab" onclick="switchMainTab('bank')">Question Bank</button>
@@ -673,8 +680,19 @@ let allAnswersShown = false;
 
 // ── Dashboard ──────────────────────────────────────────────
 
+let portalSubject = 'Mathematics';
+
+function setPortalSubject(subj) {
+  portalSubject = subj;
+  document.getElementById('subjMathBtn').classList.toggle('active', subj === 'Mathematics');
+  document.getElementById('subjSciBtn').classList.toggle('active', subj === 'Science');
+  loadExams();
+  loadCurriculum();
+  if (document.getElementById('bankSection').style.display !== 'none') loadBankQuestions();
+}
+
 async function loadExams() {
-  const res = await fetch(`${API}/api/exams`);
+  const res = await fetch(`${API}/api/exams?subject=${encodeURIComponent(portalSubject)}`);
   const exams = await res.json();
   const grid = document.getElementById('examGrid');
   if (exams.length === 0) {
@@ -1010,7 +1028,7 @@ function escHtml(s) {
 let curriculumTopics = [];
 
 async function loadCurriculum() {
-  const res = await fetch(`${API}/api/curriculum/topics`);
+  const res = await fetch(`${API}/api/curriculum/topics?subject=${encodeURIComponent(portalSubject)}`);
   curriculumTopics = await res.json();
   // Populate bank topic filter
   const sel = document.getElementById('bankTopicFilter');
@@ -1033,7 +1051,7 @@ const BANK_LIMIT = 20;
 async function loadBankQuestions(offset = 0) {
   bankOffset = offset;
   const topicId = document.getElementById('bankTopicFilter').value;
-  let url = `${API}/api/curriculum/questions?limit=${BANK_LIMIT}&offset=${offset}`;
+  let url = `${API}/api/curriculum/questions?limit=${BANK_LIMIT}&offset=${offset}&subject=${encodeURIComponent(portalSubject)}`;
   if (topicId) url += `&topic_id=${topicId}`;
 
   const res = await fetch(url);

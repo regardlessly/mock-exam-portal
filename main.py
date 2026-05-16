@@ -310,6 +310,7 @@ def get_topic(topic_id: int, db: Session = Depends(get_db)):
 def list_bank_questions(
     topic_id: int = None,
     subtopic_id: int = None,
+    subject: str = None,
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -319,6 +320,10 @@ def list_bank_questions(
         query = query.filter(BankQuestion.topic_id == topic_id)
     if subtopic_id:
         query = query.filter(BankQuestion.subtopic_id == subtopic_id)
+    if subject:
+        query = query.join(
+            CurriculumTopic, BankQuestion.topic_id == CurriculumTopic.id
+        ).filter(CurriculumTopic.subject == subject)
     total = query.count()
     questions = query.order_by(BankQuestion.topic_id, BankQuestion.question_number).offset(offset).limit(limit).all()
     return {
