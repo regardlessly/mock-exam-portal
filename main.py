@@ -54,8 +54,11 @@ def get_db():
 # ── Exam endpoints ──────────────────────────────────────────────
 
 @app.get("/api/exams")
-def list_exams(db: Session = Depends(get_db)):
-    exams = db.query(Exam).order_by(Exam.created_at.desc()).all()
+def list_exams(subject: str = None, db: Session = Depends(get_db)):
+    q = db.query(Exam)
+    if subject:
+        q = q.filter(Exam.subject == subject)
+    exams = q.order_by(Exam.created_at.desc()).all()
     results = []
     for e in exams:
         school_name = e.school.name if e.school else None
@@ -264,8 +267,11 @@ def serve_image(exam_id: int, filename: str):
 # ── Curriculum endpoints ─────────────────────────────────────────
 
 @app.get("/api/curriculum/topics")
-def list_topics(db: Session = Depends(get_db)):
-    topics = db.query(CurriculumTopic).order_by(CurriculumTopic.id).all()
+def list_topics(subject: str = None, db: Session = Depends(get_db)):
+    q = db.query(CurriculumTopic)
+    if subject:
+        q = q.filter(CurriculumTopic.subject == subject)
+    topics = q.order_by(CurriculumTopic.id).all()
     return [
         {
             "id": t.id,

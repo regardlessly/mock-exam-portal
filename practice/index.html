@@ -200,8 +200,8 @@ h1, h2, h3, h4 { font-weight: 600; }
 <body>
 
 <div class="app-header">
-  <h1>Math Practice</h1>
-  <div class="sub">Sec 1 Express Mathematics</div>
+  <h1 id="appTitle">Practice</h1>
+  <div class="sub" id="appSub">Sec 1 Express</div>
   <div class="header-bar" id="headerBar" style="display:none">
     <span id="studentName"></span>
     <span id="headerStats"></span>
@@ -214,6 +214,13 @@ h1, h2, h3, h4 { font-weight: 600; }
     <div class="login-card">
       <h2>Who's practising?</h2>
       <input type="text" id="nameInput" placeholder="Enter your name" onkeydown="if(event.key==='Enter')loginStudent()">
+      <div style="margin:16px 0">
+        <div style="font-size:0.85rem;color:var(--muted);margin-bottom:6px">Subject</div>
+        <div class="input-toggle" style="margin:0 auto;display:inline-flex">
+          <button class="active" id="subjMath" onclick="setSubject('Mathematics')">Mathematics</button>
+          <button id="subjSci" onclick="setSubject('Science')">Science</button>
+        </div>
+      </div>
       <br><button class="btn" onclick="loginStudent()">Start</button>
       <div class="student-list" id="existingStudents"></div>
     </div>
@@ -376,6 +383,16 @@ async function loginStudent() {
   selectStudent(student.id, student.name);
 }
 
+let currentSubject = 'Mathematics';
+
+function setSubject(subj) {
+  currentSubject = subj;
+  document.getElementById('subjMath').classList.toggle('active', subj === 'Mathematics');
+  document.getElementById('subjSci').classList.toggle('active', subj === 'Science');
+  document.getElementById('appTitle').textContent = subj + ' Practice';
+  document.getElementById('appSub').textContent = 'Sec 1 Express ' + subj;
+}
+
 function selectStudent(id, name) {
   currentStudent = {id, name};
   document.getElementById('studentName').textContent = name;
@@ -386,7 +403,7 @@ function selectStudent(id, name) {
 
 async function prefetchExamFilters() {
   try {
-    const res = await fetch(`${API}/api/practice/exam/filters`);
+    const res = await fetch(`${API}/api/practice/exam/filters?subject=${encodeURIComponent(currentSubject)}`);
     examFilters = await res.json();
   } catch {}
 }
@@ -394,7 +411,7 @@ async function prefetchExamFilters() {
 // ── Topics ─────────────────────────────────────────────────
 
 async function loadTopics() {
-  const res = await fetch(`${API}/api/practice/topics`);
+  const res = await fetch(`${API}/api/practice/topics?subject=${encodeURIComponent(currentSubject)}`);
   topics = await res.json();
   renderTopics();
   showView('topicsView');
@@ -510,7 +527,7 @@ let examFilters = [];
 
 async function showExamFilters() {
   // Load filter options
-  const res = await fetch(`${API}/api/practice/exam/filters`);
+  const res = await fetch(`${API}/api/practice/exam/filters?subject=${encodeURIComponent(currentSubject)}`);
   examFilters = await res.json();
 
   const schoolSelect = document.getElementById('examSchoolFilter');
@@ -539,7 +556,7 @@ function updatePaperFilter() {
 }
 
 async function startExam() {
-  let url = `${API}/api/practice/exam?count=5`;
+  let url = `${API}/api/practice/exam?count=5&subject=${encodeURIComponent(currentSubject)}`;
   if (selectedTopic) url += `&topic_id=${selectedTopic.id}`;
   const paperId = document.getElementById('examPaperFilter')?.value;
   const schoolId = document.getElementById('examSchoolFilter')?.value;

@@ -104,12 +104,17 @@ def list_students(db: Session = Depends(get_db)):
 # ── Topics ──────────────────────────────────────────────────
 
 @router.get("/topics")
-def practice_topics(db: Session = Depends(get_db)):
-    hit, data = cached("topics")
+def practice_topics(subject: str = "Mathematics", db: Session = Depends(get_db)):
+    hit, data = cached(f"topics:{subject}")
     if hit:
         return data
 
-    topics = db.query(CurriculumTopic).order_by(CurriculumTopic.id).all()
+    topics = (
+        db.query(CurriculumTopic)
+        .filter(CurriculumTopic.subject == subject)
+        .order_by(CurriculumTopic.id)
+        .all()
+    )
 
     # Single query for MCQ counts
     mcq_counts = dict(
@@ -134,7 +139,7 @@ def practice_topics(db: Session = Depends(get_db)):
         }
         for t in topics
     ]
-    set_cache("topics", result)
+    set_cache(f"topics:{subject}", result)
     return result
 
 
@@ -195,6 +200,7 @@ def get_exam_questions(
     topic_id: int = None,
     paper_id: int = None,
     school_id: int = None,
+    subject: str = "Mathematics",
     count: int = 5,
     db: Session = Depends(get_db),
 ):
@@ -208,6 +214,11 @@ def get_exam_questions(
         query = query.join(Paper, Question.paper_id == Paper.id).join(
             Exam, Paper.exam_id == Exam.id
         ).filter(Exam.school_id == school_id)
+    elif not paper_id:
+        # Scope to subject via exam join when not already filtered by paper
+        query = query.join(Paper, Question.paper_id == Paper.id).join(
+            Exam, Paper.exam_id == Exam.id
+        ).filter(Exam.subject == subject)
     matched_parts = query.order_by(Question.paper_id, Question.question_number, Question.part).all()
     if not matched_parts:
         raise HTTPException(404, "No exam questions found for these filters")
@@ -274,9 +285,9 @@ def get_exam_questions(
 
 
 @router.get("/exam/filters")
-def get_exam_filters(db: Session = Depends(get_db)):
+def get_exam_filters(subject: str = "Mathematics", db: Session = Depends(get_db)):
     """Get available schools and papers for filtering."""
-    hit, data = cached("exam_filters")
+    hit, data = cached(f"exam_filters:{subject}")
     if hit:
         return data
     from models import Paper, Exam
@@ -285,6 +296,7 @@ def get_exam_filters(db: Session = Depends(get_db)):
         db.query(Exam, School, Paper)
         .join(School, Exam.school_id == School.id)
         .join(Paper, Paper.exam_id == Exam.id)
+        .filter(Exam.subject == subject)
         .order_by(Exam.school_id, Exam.year, Paper.paper_number)
         .all()
     )
@@ -298,7 +310,7 @@ def get_exam_filters(db: Session = Depends(get_db)):
             }
         exams_map[exam.id]["papers"].append({"id": paper.id, "paper_number": paper.paper_number})
     result = list(exams_map.values())
-    set_cache("exam_filters", result)
+    set_cache(f"exam_filters:{subject}", result)
     return result
 
 

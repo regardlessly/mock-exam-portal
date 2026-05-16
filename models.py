@@ -84,6 +84,7 @@ class CurriculumTopic(Base):
     semester = Column(Integer, nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
+    subject = Column(String, default="Mathematics")
     created_at = Column(DateTime, server_default=func.now())
     subtopics = relationship("CurriculumSubtopic", back_populates="topic", order_by="CurriculumSubtopic.sort_order")
     bank_questions = relationship("BankQuestion", back_populates="topic")
