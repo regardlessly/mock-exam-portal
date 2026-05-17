@@ -1,31 +1,36 @@
-"""Seed Broadrick Secondary School 2019 Sec 1 Express Science (Section A MCQ)."""
+"""Seed Broadrick Secondary School SA2 (EOY) 2019 Sec 1 Express Science exam (MCQ Section A).
+
+Re-transcribed from /Users/timmy/Downloads/sec1-papers/science/2019-Sec-1-Express-Science-SA2-Broadrick-Secondary.pdf
+Section A = 30 MCQ (printed pages 3-11 = PDF idx 0-8).
+Correct options taken from the official MARKING SCHEME in the same PDF (PDF idx 25).
+"""
 
 import os
 from datetime import date
 
 from models import SessionLocal, School, Exam, Paper, Question, Answer, init_db
-from processor import crop_question_image, copy_existing_images
+from processor import crop_question_image
 
 PDF_PATH = "/Users/timmy/Downloads/sec1-papers/science/2019-Sec-1-Express-Science-SA2-Broadrick-Secondary.pdf"
-IMAGES_DIR = "/tmp/broadrick_sci_pages"
 
 init_db()
 
 
-def add_q(db, paper_id, exam_dir, paper_num, num, text, topic, topic_id,
-          pdf_page, crop_region, answer_text):
-    img_name = f"q{paper_num}_{num}.png"
+def add_q(db, paper_id, exam_dir, paper_num, num, part, text, marks, topic,
+          pdf_page, crop_region, answer_text, mark_scheme, stem=None, topic_id=None):
+    part_suffix = part.replace("(", "").replace(")", "") if part else ""
+    img_name = f"q{paper_num}_{num}{part_suffix}.png"
     img_path = os.path.join(exam_dir, img_name)
     pg, top, bot = crop_region
     crop_question_image(PDF_PATH, pg, top, bot, img_path)
     q = Question(
-        paper_id=paper_id, question_number=num, part=None, stem=None,
-        question_text=text, marks=1, topic=topic, topic_id=topic_id,
+        paper_id=paper_id, question_number=num, part=part, stem=stem,
+        question_text=text, marks=marks, topic=topic, topic_id=topic_id,
         page_image=img_name, pdf_page=pdf_page,
     )
     db.add(q)
     db.flush()
-    db.add(Answer(question_id=q.id, answer_text=answer_text, mark_scheme="B1"))
+    db.add(Answer(question_id=q.id, answer_text=answer_text, mark_scheme=mark_scheme))
     return q
 
 
@@ -38,11 +43,13 @@ def main():
         db.add(school)
         db.flush()
 
+    # Idempotent re-seed scoped by school + year + subject so the 2017 and 2019
+    # Broadrick Science exams stay independent and never delete each other.
     existing = db.query(Exam).filter(
         Exam.school_id == school.id, Exam.year == 2019,
         Exam.subject == "Science").first()
     if existing:
-        print(f"Broadrick Science 2019 already seeded (id={existing.id}). Re-seeding.")
+        print(f"Broadrick 2019 Science already seeded (id={existing.id}). Deleting and re-seeding.")
         for p in existing.papers:
             for q in p.questions:
                 db.query(Answer).filter(Answer.question_id == q.id).delete()
@@ -62,247 +69,256 @@ def main():
 
     exam_dir = os.path.join(os.path.dirname(__file__), "uploads", str(exam.id))
     os.makedirs(exam_dir, exist_ok=True)
-    copy_existing_images(IMAGES_DIR, exam_dir)
 
-    # ══════════════════════════════════════════════
-    # SECTION A — Multiple Choice, 30 questions, pages 3-13 (idx 0-12)
-    # ══════════════════════════════════════════════
-    p1 = Paper(exam_id=exam.id, paper_number=1, duration_minutes=60, total_marks=30,
+    p1 = Paper(exam_id=exam.id, paper_number=1, duration_minutes=None, total_marks=30,
                date=date(2019, 10, 1),
-               instructions="Section A. Answer all questions. Shade your answers in the OTAS provided.")
+               instructions="Section A: 30 MCQ (30 marks). Shade your answers in the OTAS provided.")
     db.add(p1); db.flush()
 
-    add_q(db, p1.id, exam_dir, 1, 1,
-        r"Which of the symbols should be printed on a bottle of alcohol?"
-        "\n\nA. flammable symbol\nB. harmful/irritant symbol\nC. toxic (cross) symbol\nD. explosive symbol",
-        "Laboratory Safety / Hazard Symbols", 101, 3, (0, 0.06, 0.24),
-        "A — alcohol is flammable, so the flammable hazard symbol is used.")
+    def mcq(num, text, topic, topic_id, pg, top, bot, opts, ans):
+        add_q(db, p1.id, exam_dir, 1, num, None,
+              text + "\n\n" + opts, 1, topic, num, (pg, top, bot),
+              ans, "B1", topic_id=topic_id)
 
-    add_q(db, p1.id, exam_dir, 1, 2,
-        r"Which of the following is a property of a luminous flame?"
-        "\n\nA. It is invisible at a distance."
-        "\nB. It does not produce soot."
-        "\nC. It is produced when the air-hole is closed."
-        "\nD. It is hotter than the non-luminous flame.",
-        "Laboratory Apparatus — Bunsen flame", 101, 3, (0, 0.24, 0.36),
-        "C — a luminous flame is produced when the air-hole is closed.")
+    # ---- idx 0 (printed p3): Q1-Q4 ----
+    mcq(1, r"A pair of vernier calipers is used to measure the thickness of a book. "
+        r"What is the thickness of the book?",
+        "Physical Quantities, Units & Measurement", 102, 0, 0.08, 0.40,
+        "A. 2.03 cm\nB. 2.31 cm\nC. 2.51 cm\nD. 2.62 cm",
+        "C — main scale 2.5 cm plus vernier coincidence gives a reading of 2.51 cm.")
+    mcq(2, r"Which instrument below can be used to measure the amount of matter in a substance?",
+        "Physical Quantities, Units & Measurement", 102, 0, 0.40, 0.50,
+        "A. burette\nB. spring balance\nC. beam balance\nD. displacement can",
+        "C — a beam balance measures mass, which is the amount of matter in a substance.")
+    mcq(3, r"The table shows information about four objects P, Q, R and S with their mass (g) "
+        r"and volume (cm$^3$). Which two objects have the same density?",
+        "Physical Quantities, Units & Measurement", 102, 0, 0.50, 0.72,
+        r"A. P and Q\nB. P and R\nC. Q and S\nD. R and S",
+        r"B — P: 30/6 = 5 g/cm$^3$ and R: 50/10 = 5 g/cm$^3$ have the same density.")
+    mcq(4, r"A measuring cylinder contains 100 cm$^3$ of water. An irregularly shaped object of "
+        r"mass 50 g is lowered slowly into the cylinder until it is completely immersed. Given "
+        r"that the density of the object is 5.0 g/cm$^3$, what is the new reading on the "
+        r"measuring cylinder?",
+        "Physical Quantities, Units & Measurement", 102, 0, 0.72, 0.95,
+        r"A. 105 cm$^3$\nB. 110 cm$^3$\nC. 150 cm$^3$\nD. 155 cm$^3$",
+        r"B — object volume = 50/5.0 = 10 cm$^3$; new reading = 100 + 10 = 110 cm$^3$.")
 
-    add_q(db, p1.id, exam_dir, 1, 3,
-        r"Justin wants to find the volume of a cork by using a measuring cylinder. He uses a stone to keep the cork under water. The results of each stage of the experiment are shown. What is the volume of the cork?"
-        "\n\nA. 2 cm$^3$\nB. 6 cm$^3$\nC. 22 cm$^3$\nD. 28 cm$^3$",
-        "Measurement — Volume by displacement", 102, 3, (0, 0.36, 0.95),
-        "B — cork volume = (water+cork+stone) − (water+stone) reading = 6 cm$^3$.")
+    # ---- idx 1 (printed p4): Q5-Q9 ----
+    mcq(5, r"The table shows the properties (density, electrical conductivity, appearance) of "
+        r"four different materials. Which material is possibly a metal?",
+        "Elements, Compounds & Mixtures", 104, 1, 0.05, 0.25,
+        "A. low density, poor conductivity, yellow\nB. low density, good conductivity, black\n"
+        "C. high density, poor conductivity, shiny\nD. high density, good conductivity, shiny",
+        "D — metals typically have high density, good electrical conductivity and a shiny appearance.")
+    mcq(6, r"A robotic vehicle, which has a weight of 800 N on Earth, was sent to Mars. The "
+        r"gravitational field strength is 4 N/kg on Mars and 10 N/kg on Earth. What is the "
+        r"robotic vehicle's weight on Mars?",
+        "Forces", 112, 1, 0.25, 0.40,
+        "A. 20 N\nB. 32 N\nC. 200 N\nD. 320 N",
+        "D — mass = 800/10 = 80 kg; weight on Mars = 80 × 4 = 320 N.")
+    mcq(7, r"In which of the following positions will a person exert the greatest pressure on the "
+        r"ground?",
+        "Forces", 112, 1, 0.40, 0.55,
+        "A. The person stands on one foot.\nB. The person sits cross-legged on the floor.\n"
+        "C. The person stands on both feet.\nD. The person lies flat on his back.",
+        "A — standing on one foot gives the smallest contact area, hence the greatest pressure.")
+    mcq(8, r"An object with a mass of 2.0 kg has 300 J of kinetic energy. What is the speed of "
+        r"the object?",
+        "Energy", 111, 1, 0.53, 0.70,
+        "A. 8.7 m/s\nB. 12.8 m/s\nC. 17.3 m/s\nD. 24.5 m/s",
+        r"C — KE = $\frac{1}{2}mv^2$; $v = \sqrt{2 \times 300 / 2.0} = \sqrt{300} \approx 17.3$ m/s.")
+    mcq(9, r"In which of the following cases is there completely no work done?",
+        "Energy", 111, 1, 0.70, 0.92,
+        "A. A car slowing down when approaching a pedestrian crossing.\n"
+        "B. A man holding a big shopping bag on an escalator moving upwards.\n"
+        "C. A student holding her files standing at the bus stop.\n"
+        "D. A delivery man holding a new TV set standing in a lift moving upwards.",
+        "C — the student is stationary, so there is no displacement and no work is done.")
 
-    add_q(db, p1.id, exam_dir, 1, 4,
-        r"Which of the following SI units are correctly matched?"
-        "\n\nI. length — metre (m)\nII. time — minutes (min)\nIII. temperature — Kelvin (K)"
-        "\n\nA. I and II only\nB. I and III only\nC. II and III only\nD. I, II and III",
-        "Physical Quantities & Units", 102, 4, (1, 0.04, 0.20),
-        "B — length is in metres and temperature in Kelvin; the SI unit of time is the second, not minutes.")
+    # ---- idx 2 (printed p5): Q10-Q12 ----
+    mcq(10, r"The total energy of a free falling object is the sum of the gravitational potential "
+        r"energy and kinetic energy. Assuming air resistance is negligible, which row best "
+        r"represents the changes in the different energies when the object is falling freely "
+        r"under gravity (gravitational potential energy, kinetic energy, total energy)?",
+        "Energy", 111, 2, 0.05, 0.30,
+        "A. GPE increases, KE decreases, total remains constant\n"
+        "B. GPE decreases, KE increases, total remains constant\n"
+        "C. GPE decreases, KE increases, total decreases\n"
+        "D. GPE increases, KE decreases, total increases",
+        "B — as the object falls, GPE decreases and KE increases while total energy is conserved (constant).")
+    mcq(11, r"Which of the following physical properties can be used to describe non-metals? "
+        r"I They are poor conductors of electricity. II They have lower melting and boiling "
+        r"points. III They are brittle.",
+        "Elements, Compounds & Mixtures", 104, 2, 0.30, 0.52,
+        "A. I, II\nB. II, III\nC. I, III\nD. I, II, III",
+        "D — non-metals are generally poor conductors, have lower melting/boiling points and are brittle.")
+    mcq(12, r"The diagram below shows the particles found in substance M (open and filled "
+        r"circles representing different elements). Which of the following statements correctly "
+        r"describes Substance M?",
+        "Elements, Compounds & Mixtures", 104, 2, 0.52, 0.95,
+        "A. Substance M is a compound.\nB. Substance M is a mixture of elements.\n"
+        "C. Substance M is a mixture of compounds.\n"
+        "D. Substance M is a mixture of an element and a compound.",
+        "D — the diagram shows bonded two-element molecules (a compound) together with "
+        "separate single-element particles, i.e. a mixture of an element and a compound.")
 
-    add_q(db, p1.id, exam_dir, 1, 5,
-        r"Huimin used a pair of vernier calipers to measure the diameter of a test tube. How large is the diameter of the test tube?"
-        "\n\nA. 2.14 cm\nB. 2.15 cm\nC. 2.45 cm\nD. 2.54 cm",
-        "Measurement — Vernier calipers", 102, 4, (1, 0.20, 0.46),
-        "A — main scale 2 cm + vernier reading gives 2.14 cm.")
+    # ---- idx 3 (printed p6): Q13-Q15 ----
+    mcq(13, r"The set-up shows a simple distillation experiment. The boiling points of pure "
+        r"water and blue ink are 100 °C and 150 °C respectively. What are the colours of the "
+        r"liquids in the flask and beaker at 100 °C (flask, beaker)?",
+        "Separation Techniques", 105, 3, 0.05, 0.42,
+        "A. flask blue, beaker blue\nB. flask blue, beaker colourless\n"
+        "C. flask colourless, beaker blue\nD. flask colourless, beaker colourless",
+        "B — at 100 °C only the water boils off and condenses colourless in the beaker; the "
+        "blue ink remains in the flask.")
+    mcq(14, r"Sodium benzoate is a preservative. Its chemical formula is C$_6$H$_5$COONa. "
+        r"How many elements are present in the formula shown?",
+        "Elements, Compounds & Mixtures", 104, 3, 0.42, 0.55,
+        "A. 2\nB. 3\nC. 4\nD. 5",
+        "C — the elements present are carbon, hydrogen, oxygen and sodium (4 elements).")
+    mcq(15, r"In the Periodic Table shown, each number represents an element. Which two "
+        r"numbers represent non-metals in the same Group?",
+        "Elements, Compounds & Mixtures", 104, 3, 0.55, 0.95,
+        "A. 1 and 2\nB. 3 and 8\nC. 4 and 9\nD. 6 and 7",
+        "D — elements 6 and 7 are non-metals in the same Group (same column on the right of "
+        "the Periodic Table).")
 
-    add_q(db, p1.id, exam_dir, 1, 6,
-        r"A student aims to investigate how an egg of the same density will behave in liquids of different densities. List the liquids P to S from the densest to the least dense."
-        "\n\nA. P, Q, R, S\nB. S, R, Q, P\nC. R, Q, P, S\nD. S, P, Q, R",
-        "Density — Floating and Sinking", 102, 4, (1, 0.46, 0.70),
-        "B — the egg floats highest in the densest liquid; order densest to least is S, R, Q, P.")
+    # ---- idx 4 (printed p7): Q16-Q18 ----
+    mcq(16, r"A glass of apple juice is a solution while orange juice is considered a "
+        r"suspension. Which of the following correctly identifies the difference between a "
+        r"suspension and a solution?",
+        "Solutions & Solubility", 106, 4, 0.05, 0.28,
+        "A. The speed at which the solute dissolves in the solvent.\n"
+        "B. The amount of solute that can dissolve in the solvent.\n"
+        "C. When left to stand, whether particles are suspended in the liquid.\n"
+        "D. Any change in colour.",
+        "C — in a suspension the particles are suspended and settle on standing, whereas a "
+        "solution stays uniformly mixed.")
+    mcq(17, r"The effect of temperature on the solubility of two substances P and Q in the same "
+        r"amount of solvent was investigated (see graph). Which statement cannot be "
+        r"concluded from the graph?",
+        "Solutions & Solubility", 106, 4, 0.28, 0.55,
+        "A. Solubility of substance P continues to increase after 80 °C.\n"
+        "B. Substance Q has reached the maximum solubility after 40 °C.\n"
+        "C. At 20 °C, substance Q dissolves more than substance P.\n"
+        "D. Solubility of substance P increases when temperature increases from 20 °C to 40 °C.",
+        "A — the graph only goes up to about 80 °C, so behaviour after 80 °C cannot be concluded.")
+    mcq(18, r"The diagram shows a specialized cell from a plant. Which function is the cell "
+        r"modified for?",
+        "Cells — The Basic Unit of Life", 107, 4, 0.55, 0.88,
+        "A. absorption of water\nB. photosynthesis\nC. storage of food\nD. support",
+        "A — the long extension (root hair cell) increases surface area for the absorption of water.")
 
-    add_q(db, p1.id, exam_dir, 1, 7,
-        r"An object is placed 5 m in front of a mirror. A boy sits between the object and the mirror and viewed that the image of the object is 7 m away from him. What is the distance between the boy and the object?"
-        "\n\nA. 2 m\nB. 3 m\nC. 4 m\nD. 5 m",
-        "Ray Model of Light — Reflection", 114, 4, (1, 0.70, 0.95),
-        "B — image is 5 m behind mirror; boy is 7−5 = 2 m from mirror, so 5−2 = 3 m from the object.")
+    # ---- idx 5 (printed p8): Q19-Q21 ----
+    mcq(19, r"The diagram shows some heart muscle cells. Which describes the level of "
+        r"organisation of the cells and their specific function (level of organisation, "
+        r"specific function)?",
+        "Cells — The Basic Unit of Life", 107, 5, 0.05, 0.30,
+        "A. organ, contraction\nB. organ, support\nC. tissue, support\nD. tissue, contraction",
+        "D — many similar muscle cells form a tissue whose specific function is contraction.")
+    mcq(20, r"An Amoeba, a unicellular organism, had its nucleus removed using a fine glass "
+        r"tube but was otherwise not damaged. For seven days it continued to move and feed "
+        r"but did not reproduce. An intact Amoeba used as a control reproduced twice in seven "
+        r"days. What is another function of the nucleus that can be concluded from this "
+        r"experiment?",
+        "Cells — The Basic Unit of Life", 107, 5, 0.30, 0.55,
+        "A. The nucleus controls cellular activities.\n"
+        "B. The nucleus controls the movement of the cell.\n"
+        "C. The nucleus is essential for cell reproduction.\n"
+        "D. The nucleus is essential for the uptake of water.",
+        "C — only the reproduction stopped when the nucleus was removed, so the nucleus is "
+        "essential for cell reproduction.")
+    mcq(21, r"The diagram shows a cell observed under a microscope. Which are the correct "
+        r"labels for cell organelle 1, 2, 3 and 4 (cellulose cell wall, cell surface "
+        r"membrane, chloroplast, cytoplasm)?",
+        "Cells — The Basic Unit of Life", 107, 5, 0.55, 0.92,
+        "A. cell wall 1, membrane 2, chloroplast 3, cytoplasm 4\n"
+        "B. cell wall 1, membrane 2, chloroplast 4, cytoplasm 3\n"
+        "C. cell wall 2, membrane 1, chloroplast 3, cytoplasm 4\n"
+        "D. cell wall 2, membrane 1, chloroplast 4, cytoplasm 3",
+        "C — the outermost layer (2) is the cellulose cell wall, (1) the cell surface membrane, "
+        "(3) the chloroplast and (4) the cytoplasm.")
 
-    add_q(db, p1.id, exam_dir, 1, 8,
-        r"The diagram shows a ray of light entering a block of glass. Which numbered angles are the angles of incidence and of refraction?"
-        "\n\nA. incidence 1, refraction 3\nB. incidence 1, refraction 4\nC. incidence 2, refraction 3\nD. incidence 2, refraction 4",
-        "Ray Model of Light — Refraction", 114, 5, (2, 0.04, 0.40),
-        "D — angle of incidence (2) and angle of refraction (4) are both measured from the normal.")
+    # ---- idx 6 (printed p9): Q22-Q24 ----
+    mcq(22, r"Four clear agar blocks A, B, C and D of different dimensions were placed in "
+        r"solutions of methylene blue of the same concentration. Which agar block will be the "
+        r"slowest to be completely stained blue?",
+        "Movement of Substances", 108, 6, 0.05, 0.42,
+        "A. block A (smallest cube)\nB. block B (largest cube)\n"
+        "C. block C (small cube)\nD. block D (large cube)",
+        "B — the largest block has the smallest surface area to volume ratio, so diffusion to "
+        "its centre is slowest.")
+    mcq(23, r"The diagram shows an experiment: a model gut (membrane bag) of white starch "
+        r"suspension in yellow-brown iodine solution; after 6 hours the starch suspension "
+        r"turns blue-black. Why has the starch suspension changed colour at the end of the "
+        r"experiment?",
+        "Movement of Substances", 108, 6, 0.42, 0.78,
+        "A. Iodine has diffused in through the membrane.\n"
+        "B. Iodine has diffused out through the membrane.\n"
+        "C. Starch has diffused in through the membrane.\n"
+        "D. Starch has diffused out through the membrane.",
+        "A — small iodine molecules diffuse in through the membrane and turn the starch blue-black.")
+    mcq(24, r"Which statements are true? I Plasma helps to transport dissolved substances. "
+        r"II Platelets help in the clotting of blood. III White blood cells help to transport "
+        r"oxygen.",
+        "Transport in Living Things", 110, 6, 0.78, 0.95,
+        "A. I and II only\nB. I and III only\nC. II and III only\nD. I, II and III",
+        "A — I and II are true; oxygen is transported by red blood cells, not white blood cells, "
+        "so III is false.")
 
-    add_q(db, p1.id, exam_dir, 1, 9,
-        r"The following diagram shows the path of light as it passes through four substances. Which of the following options ranks the four substances in increasing order of density?"
-        "\n\nA. glass, plastic, neon, hydrogen"
-        "\nB. hydrogen, neon, glass, plastic"
-        "\nC. hydrogen, neon, plastic, glass"
-        "\nD. plastic, glass, neon, hydrogen",
-        "Ray Model of Light — Refraction & Density", 114, 5, (2, 0.40, 0.95),
-        "C — greater bending towards the normal indicates higher optical density: hydrogen, neon, plastic, glass.")
+    # ---- idx 7 (printed p10): Q25-Q26 ----
+    mcq(25, r"The diagram shows red blood cells placed in solutions P, Q, R and S of different "
+        r"solute concentrations. After one minute the appearance of the cells was as shown. "
+        r"Which conclusion can be drawn from these observations?",
+        "Movement of Substances", 108, 7, 0.05, 0.45,
+        "A. Solution P has a lower water potential than the cytoplasm of the red blood cell.\n"
+        "B. Solution Q has a higher water potential than the cytoplasm of the red blood cell.\n"
+        "C. Solution R has a lower water potential than the cytoplasm of the red blood cell.\n"
+        "D. Solution S has approximately the same solute concentration as the cytoplasm of "
+        "the red blood cell.",
+        "A — the cells in solution P shrank (crenated), showing solution P has a lower water "
+        "potential than the cell cytoplasm.")
+    mcq(26, r"The diagram shows a simplified model of blood circulation in a mammal "
+        r"(Rest of Body — Heart — Lungs, vessels 1, 2, 3, 4). Which correctly shows the "
+        r"identity of blood vessels 1, 2, 3 and 4 (artery, vein)?",
+        "Transport in Living Things", 110, 7, 0.45, 0.78,
+        "A. artery 1 and 2, vein 3 and 4\nB. artery 1 and 3, vein 2 and 4\n"
+        "C. artery 1 and 4, vein 2 and 3\nD. artery 2 and 3, vein 1 and 4",
+        "D — vessels 2 and 3 carry blood away from the heart (arteries); vessels 1 and 4 "
+        "return blood to the heart (veins).")
 
-    add_q(db, p1.id, exam_dir, 1, 10,
-        r"A student shines a narrow beam of white light into a prism. He sees a spectrum of colours emerging from the prism. Which three colours does he see at X, at Y and at Z?"
-        "\n\nA. X violet, Y yellow, Z red"
-        "\nB. X red, Y violet, Z yellow"
-        "\nC. X red, Y yellow, Z violet"
-        "\nD. X yellow, Y red, Z violet",
-        "Ray Model of Light — Dispersion", 114, 6, (3, 0.04, 0.30),
-        "A — violet is refracted most (X, top), then yellow (Y), then red least (Z).")
-
-    add_q(db, p1.id, exam_dir, 1, 11,
-        r"Which of the following statements is true?"
-        "\n\nA. A magenta object appears red in blue light."
-        "\nB. A blue object appears blue only in blue light."
-        "\nC. A green object appears yellow in white light."
-        "\nD. A black object appears black in light of any colour.",
-        "Ray Model of Light — Colour", 114, 6, (3, 0.30, 0.50),
-        "D — a black object absorbs all colours, so it appears black under any colour of light.")
-
-    add_q(db, p1.id, exam_dir, 1, 12,
-        r"A car is travelling at an average speed of 60 km/h. Calculate how far it would travel if the motorist starts at 0800 h and ends his journey at 0940 h."
-        "\n\nA. 84 km\nB. 100 km\nC. 140 km\nD. 600 km",
-        "Speed, Distance, Time", 112, 6, (3, 0.50, 0.70),
-        "B — time = 1 h 40 min = 5/3 h; distance = 60 × 5/3 = 100 km.")
-
-    add_q(db, p1.id, exam_dir, 1, 13,
-        r"Mountain bike tires are specially designed to provide good grip on the ground. Four methods are suggested: add tread pattern on the tires; apply lubricating oil on tires; increase the width of tires; use a smooth material to make tires. How many method(s) will effectively improve the grip of mountain bike tires?"
-        "\n\nA. 1\nB. 2\nC. 3\nD. 4",
-        "Forces — Friction", 112, 6, (3, 0.70, 0.95),
-        "B — adding a tread pattern and increasing tyre width both improve grip (2 methods).")
-
-    add_q(db, p1.id, exam_dir, 1, 14,
-        r"A brick with flat rectangular sides rests on a table. The brick is then turned so that it rests on the table on its smallest surface. Which row correctly shows how the force and pressure exerted by the brick on the table changed?"
-        "\n\nA. force increased, pressure increased"
-        "\nB. force increased, pressure unchanged"
-        "\nC. force unchanged, pressure increased"
-        "\nD. force unchanged, pressure unchanged",
-        "Forces — Pressure", 112, 7, (4, 0.04, 0.28),
-        "C — weight (force) is unchanged, but smaller contact area increases the pressure.")
-
-    add_q(db, p1.id, exam_dir, 1, 15,
-        r"Which are the correct units for friction, weight and pressure?"
-        "\n\nA. friction N, weight N, pressure Pa"
-        "\nB. friction kg, weight kg, pressure Pa"
-        "\nC. friction kg, weight g, pressure kg/m$^2$"
-        "\nD. friction N, weight N, pressure kg/m$^2$",
-        "Forces — Units", 112, 7, (4, 0.28, 0.46),
-        "A — friction and weight are forces measured in newtons (N); pressure is measured in pascals (Pa).")
-
-    add_q(db, p1.id, exam_dir, 1, 16,
-        r"A boy holds a 40-newton dumbbell at arm's length for 10 seconds. His arm is 1.5 metres above the ground. What is the work done by the force of the boy on the 40-newton dumbbell when he is holding it?"
-        "\n\nA. 0 J\nB. 40 J\nC. 60 J\nD. 400 J",
-        "Energy / Work", 111, 7, (4, 0.46, 0.66),
-        "A — there is no movement in the direction of the force, so work done = 0 J.")
-
-    add_q(db, p1.id, exam_dir, 1, 17,
-        r"A ball rolls down a ramp. Assuming there is no friction, what is the highest possible position the ball can reach?"
-        "\n\nA. position A\nB. position B\nC. position C\nD. position D",
-        "Energy — Conservation", 111, 7, (4, 0.66, 0.95),
-        "B — without friction, the ball can rise only to a height equal to its starting height (position B).")
-
-    add_q(db, p1.id, exam_dir, 1, 18,
-        r"Which of the following is a correct classification of an organelle, a cell, a tissue or an organ?"
-        "\n\nA. cell — chloroplast\nB. organ — nucleus\nC. organelle — kidney\nD. tissue — blood",
-        "Cells — Organisation", 107, 8, (5, 0.04, 0.24),
-        "D — blood is a tissue (the others are mismatched).")
-
-    add_q(db, p1.id, exam_dir, 1, 19,
-        r"The table shows the composition of four foods in grams per 100 g portion. Which food would be most useful for providing an immediate source of energy?"
-        "\n\nA. carbohydrate 69.2, fat 0.0, protein 0.5"
-        "\nB. carbohydrate 8.6, fat 49.0, protein 28.1"
-        "\nC. carbohydrate 0.0, fat 0.9, protein 18.0"
-        "\nD. carbohydrate 4.8, fat 3.8, protein 3.3",
-        "Human Digestive System — Nutrients", 109, 8, (5, 0.24, 0.46),
-        "A — highest carbohydrate content provides the most immediate source of energy.")
-
-    add_q(db, p1.id, exam_dir, 1, 20,
-        r"The diagram represents stages in the breakdown of starch to maltose by the enzyme amylase. Which line is correct?"
-        "\n\nA. starch P, maltose R, amylase Q"
-        "\nB. starch Q, maltose R, amylase P"
-        "\nC. starch Q, maltose P, amylase R"
-        "\nD. starch R, maltose Q, amylase P",
-        "Human Digestive System — Enzymes", 109, 8, (5, 0.46, 0.95),
-        "B — substrate (starch) Q, products (maltose) R, enzyme amylase P.")
-
-    add_q(db, p1.id, exam_dir, 1, 21,
-        r"The diagram shows the human digestive system. Where is bile made, where is it stored and where does it act?"
-        "\n\nA. made P, stored Q, acts R"
-        "\nB. made P, stored R, acts T"
-        "\nC. made Q, stored S, acts P"
-        "\nD. made Q, stored T, acts S",
-        "Human Digestive System — Bile", 109, 9, (6, 0.04, 0.46),
-        "B — bile is made in the liver (P), stored in the gall bladder (R) and acts in the small intestine (T).")
-
-    add_q(db, p1.id, exam_dir, 1, 22,
-        r"In the outline of the Periodic Table shown below some elements are represented by numbers. Which two of these are non-metals in the same Period?"
-        "\n\nA. 1 and 3\nB. 2 and 6\nC. 4 and 5\nD. 5 and 6",
-        "Elements — Periodic Table", 104, 9, (6, 0.46, 0.95),
-        "C — elements 4 and 5 are non-metals located in the same Period.")
-
-    add_q(db, p1.id, exam_dir, 1, 23,
-        r"The table gives the melting points, densities and electrical conductivities of four elements. Which element is copper?"
-        "\n\nA. m.p. −38.9 °C, density 13.6 g/cm$^3$, good conductivity"
-        "\nB. m.p. −7.2 °C, density 3.12 g/cm$^3$, poor conductivity"
-        "\nC. m.p. 97.8 °C, density 0.97 g/cm$^3$, good conductivity"
-        "\nD. m.p. 1083 °C, density 8.96 g/cm$^3$, good conductivity",
-        "Elements — Properties of Metals", 104, 10, (7, 0.04, 0.30),
-        "D — copper has a high melting point (1083 °C), density 8.96 g/cm$^3$ and good conductivity.")
-
-    add_q(db, p1.id, exam_dir, 1, 24,
-        r"The symbols (open and filled circles) represent particles of different elements. Which diagram shows a mixture of an element and a compound?"
-        "\n\nA. diagram A\nB. diagram B\nC. diagram C\nD. diagram D",
-        "Elements, Compounds & Mixtures", 104, 10, (7, 0.30, 0.95),
-        "D — diagram D shows separate single-element particles together with bonded compound particles.")
-
-    add_q(db, p1.id, exam_dir, 1, 25,
-        r"Cobalt chloride has a chemical formula of CoCl$_2$. Four statements are made: "
-        r"(1) Cobalt chloride is a mixture of elements. "
-        r"(2) Cobalt chloride can be broken down by chemical methods. "
-        r"(3) The constituent elements of cobalt chloride are carbon, oxygen and chlorine. "
-        r"(4) There are two chlorine particles in cobalt chloride. Which of the statements are correct?"
-        "\n\nA. 1 and 2 only\nB. 2 and 3 only\nC. 2 and 4 only\nD. 2, 3 and 4",
-        "Elements, Compounds & Mixtures", 104, 11, (8, 0.04, 0.36),
-        "C — statements 2 and 4 are correct: a compound can be broken down chemically and CoCl$_2$ has two chlorine atoms.")
-
-    add_q(db, p1.id, exam_dir, 1, 26,
-        r"A mixture can be classified as a solution or a suspension. Which of the following methods will not allow you to distinguish between a solution and a suspension?"
-        "\n\nA. allow the mixture to stand for a period of time"
-        "\nB. shine a beam of light through the mixture"
-        "\nC. filter the mixture"
-        "\nD. heat the mixture strongly",
-        "Solutions & Solubility", 106, 11, (8, 0.36, 0.56),
-        "D — heating the mixture strongly does not distinguish a solution from a suspension.")
-
-    add_q(db, p1.id, exam_dir, 1, 27,
-        r"A very old painting has been vandalised with new paint. The solubilities of the old and new paints in different solvents A, B, C and D are shown. Which solvent could be used to remove the vandalism without damaging the original paint?"
-        "\n\nA. old paint insoluble, new paint insoluble"
-        "\nB. old paint insoluble, new paint soluble"
-        "\nC. old paint soluble, new paint insoluble"
-        "\nD. old paint soluble, new paint soluble",
-        "Solutions & Solubility", 106, 11, (8, 0.56, 0.95),
-        "B — a solvent in which the old paint is insoluble but the new paint is soluble removes the vandalism safely.")
-
-    add_q(db, p1.id, exam_dir, 1, 28,
-        r"Singapore uses reverse osmosis as one of the separation techniques in the process of producing NEWater. Which one of the following best describes the process of reverse osmosis?"
-        "\n\nA. A high pressure is used to push a solvent through a partially permeable membrane."
-        "\nB. A low pressure is used to push a solvent through a partially permeable membrane."
-        "\nC. A high pressure is used to force bacteria and viruses through a partially permeable membrane so that they are removed from the solution."
-        "\nD. A low pressure is used to force bacteria and viruses through a partially permeable membrane for removal from the solution.",
-        "Separation Techniques — Reverse osmosis", 105, 12, (9, 0.04, 0.42),
-        "A — reverse osmosis uses high pressure to push the solvent (water) through a partially permeable membrane.")
-
-    add_q(db, p1.id, exam_dir, 1, 29,
-        r"The table shows steps that are used to separate a mixture containing iron filings, chalk powder and table salt. The steps are not in correct sequence: "
-        r"(1) heating to dryness; (2) using a bar magnet; (3) dissolving in water; (4) filtering. "
-        r"Which of the following shows the correct sequence to obtain these substances separately?"
-        "\n\nA. 1 → 2 → 3 → 4\nB. 4 → 1 → 2 → 3\nC. 2 → 3 → 4 → 1\nD. 3 → 2 → 1 → 4",
-        "Separation Techniques", 105, 12, (9, 0.42, 0.80),
-        "C — remove iron with magnet (2), dissolve salt (3), filter out chalk (4), then evaporate to dryness for salt (1).")
-
-    add_q(db, p1.id, exam_dir, 1, 30,
-        r"The key shows one way to classify flowers according to the animals that they attract. Which animal would be attracted by a large, brightly coloured flower?"
-        "\n\nA. bat\nB. bee\nC. bird\nD. moth",
-        "Classification — Dichotomous Key", 107, 13, (10, 0.04, 0.55),
-        "C — following the key, a large flower that is red or yellow (brightly coloured) attracts a bird.")
+    # ---- idx 8 (printed p11): Q27-Q30 ----
+    mcq(27, r"The diagram shows a section through a stem (labelled tissues A, B, C, D). "
+        r"Which labelled tissue transports water and mineral salts towards the leaves?",
+        "Transport in Living Things", 110, 8, 0.05, 0.30,
+        "A. tissue A\nB. tissue B\nC. tissue C\nD. tissue D",
+        "D — the xylem (tissue D) transports water and mineral salts upward towards the leaves.")
+    mcq(28, r"Which of the following secretions contains enzymes that are able to break down "
+        r"carbohydrates, proteins and fats?",
+        "Human Digestive System", 109, 8, 0.30, 0.45,
+        "A. bile\nB. saliva\nC. gastric juice\nD. pancreatic juice",
+        "D — pancreatic juice contains amylase, protease and lipase, digesting all three food groups.")
+    mcq(29, r"The table shows the composition of four foods in grams per 100 g portion "
+        r"(carbohydrate, fat, protein). Which food would be most useful for providing an "
+        r"immediate source of energy?",
+        "Human Digestive System", 109, 8, 0.45, 0.68,
+        "A. food A (carbohydrate 60.2, fat 0.0, protein 0.5)\n"
+        "B. food B (carbohydrate 8.6, fat 35.0, protein 32.1)\n"
+        "C. food C (carbohydrate 0.0, fat 0.0, protein 45.0)\n"
+        "D. food D (carbohydrate 14.8, fat 10.8, protein 0.3)",
+        "A — food A has the highest carbohydrate content, which provides an immediate source of energy.")
+    mcq(30, r"The diagram shows a section of the human digestive system (labelled A, B, C, D). "
+        r"In which structure does the absorption of most food molecules occur?",
+        "Human Digestive System", 109, 8, 0.65, 0.94,
+        "A. structure A\nB. structure B\nC. structure C\nD. structure D",
+        "C — most food molecules are absorbed in the small intestine (structure C).")
 
     db.commit()
-    p1_count = len(p1.questions)
-    print(f"Seeded Broadrick Science exam id={exam.id}: Section A ({p1_count} MCQs)")
+    print(f"Seeded Broadrick Science SA2/EOY 2019 exam id={exam.id}: Section A {len(p1.questions)} MCQs")
     print(f"Images in {exam_dir}")
+    eid = exam.id
     db.close()
+    return eid
 
 
 if __name__ == "__main__":
