@@ -710,33 +710,26 @@ function examCardHtml(e) {
     </div>`;
 }
 
+const subjLabels = { 'Chinese': 'Chinese (华文)' };
+
 async function loadExams() {
-  // Fetch ALL exams and group by subject
-  const res = await fetch(`${API}/api/exams`);
+  // Filter the listing to the currently selected subject
+  const res = await fetch(`${API}/api/exams?subject=${encodeURIComponent(portalSubject)}`);
   const exams = await res.json();
   const wrap = document.getElementById('examGroups');
+  const label = subjLabels[portalSubject] || portalSubject;
   if (!exams.length) {
-    wrap.innerHTML = '<div class="empty-state"><div class="icon">&#128218;</div><p>No exams uploaded yet. Upload a PDF to get started.</p></div>';
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">&#128218;</div><p>No ${escHtml(label)} exams uploaded yet.</p></div>`;
     return;
   }
-  const order = ['Mathematics', 'Science', 'Chinese'];
-  const subjLabels = { 'Chinese': 'Chinese (华文)' };
-  const groups = {};
-  for (const e of exams) {
-    const subj = e.subject || 'Other';
-    (groups[subj] = groups[subj] || []).push(e);
-  }
-  const subjects = [...order.filter(s => groups[s]), ...Object.keys(groups).filter(s => !order.includes(s))];
-  wrap.innerHTML = subjects.map(subj => {
-    const list = groups[subj].sort((a, b) => (a.school || '').localeCompare(b.school || ''));
-    return `
-      <div style="margin-bottom:28px">
-        <h3 style="font-size:1.05rem;color:var(--primary);border-bottom:2px solid var(--primary);padding-bottom:6px;margin-bottom:14px">
-          ${escHtml(subjLabels[subj] || subj)} <span style="color:var(--gray-500);font-weight:400;font-size:0.85rem">(${list.length} exam${list.length !== 1 ? 's' : ''})</span>
-        </h3>
-        <div class="exam-grid">${list.map(examCardHtml).join('')}</div>
-      </div>`;
-  }).join('');
+  const list = exams.sort((a, b) => (a.school || '').localeCompare(b.school || ''));
+  wrap.innerHTML = `
+    <div style="margin-bottom:28px">
+      <h3 style="font-size:1.05rem;color:var(--primary);border-bottom:2px solid var(--primary);padding-bottom:6px;margin-bottom:14px">
+        ${escHtml(label)} <span style="color:var(--gray-500);font-weight:400;font-size:0.85rem">(${list.length} exam${list.length !== 1 ? 's' : ''})</span>
+      </h3>
+      <div class="exam-grid">${list.map(examCardHtml).join('')}</div>
+    </div>`;
 }
 
 // ── Upload ─────────────────────────────────────────────────
