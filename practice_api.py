@@ -205,20 +205,20 @@ def get_exam_questions(
     db: Session = Depends(get_db),
 ):
     from models import Paper, Exam
-    query = db.query(Question)
+    # Always scope through the Exam so subject is enforced (a school can have
+    # both a Math and a Science exam under the same school_id).
+    query = (
+        db.query(Question)
+        .join(Paper, Question.paper_id == Paper.id)
+        .join(Exam, Paper.exam_id == Exam.id)
+        .filter(Exam.subject == subject)
+    )
     if topic_id:
         query = query.filter(Question.topic_id == topic_id)
     if paper_id:
         query = query.filter(Question.paper_id == paper_id)
     if school_id:
-        query = query.join(Paper, Question.paper_id == Paper.id).join(
-            Exam, Paper.exam_id == Exam.id
-        ).filter(Exam.school_id == school_id)
-    elif not paper_id:
-        # Scope to subject via exam join when not already filtered by paper
-        query = query.join(Paper, Question.paper_id == Paper.id).join(
-            Exam, Paper.exam_id == Exam.id
-        ).filter(Exam.subject == subject)
+        query = query.filter(Exam.school_id == school_id)
     matched_parts = query.order_by(Question.paper_id, Question.question_number, Question.part).all()
     if not matched_parts:
         raise HTTPException(404, "No exam questions found for these filters")
