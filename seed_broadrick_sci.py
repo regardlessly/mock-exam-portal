@@ -34,6 +34,22 @@ def add_q(db, paper_id, exam_dir, paper_num, num, part, text, marks, topic,
     return q
 
 
+# Corrected crop regions for the 2019 paper, derived from actual PDF block
+# positions (page_idx, y_top, y_bottom). Overrides the per-call args.
+CROP_OVERRIDES = {
+    1: (0, 0.140, 0.405), 2: (0, 0.390, 0.510), 3: (0, 0.495, 0.743), 4: (0, 0.728, 0.950),
+    5: (1, 0.070, 0.238), 6: (1, 0.223, 0.388), 7: (1, 0.373, 0.494), 8: (1, 0.479, 0.630),
+    9: (1, 0.615, 0.950),
+    10: (2, 0.070, 0.283), 11: (2, 0.268, 0.448), 12: (2, 0.433, 0.950),
+    13: (3, 0.070, 0.476), 14: (3, 0.461, 0.611), 15: (3, 0.596, 0.950),
+    16: (4, 0.070, 0.221), 17: (4, 0.206, 0.567), 18: (4, 0.552, 0.950),
+    19: (5, 0.070, 0.325), 20: (5, 0.310, 0.505), 21: (5, 0.490, 0.950),
+    22: (6, 0.070, 0.330), 23: (6, 0.315, 0.609), 24: (6, 0.594, 0.950),
+    25: (7, 0.070, 0.501), 26: (7, 0.486, 0.950),
+    27: (8, 0.070, 0.327), 28: (8, 0.312, 0.447), 29: (8, 0.432, 0.599), 30: (8, 0.584, 0.950),
+}
+
+
 def main():
     db = SessionLocal()
 
@@ -76,8 +92,9 @@ def main():
     db.add(p1); db.flush()
 
     def mcq(num, text, topic, topic_id, pg, top, bot, opts, ans):
+        crop = CROP_OVERRIDES.get(num, (pg, top, bot))
         add_q(db, p1.id, exam_dir, 1, num, None,
-              text + "\n\n" + opts, 1, topic, num, (pg, top, bot),
+              text + "\n\n" + opts, 1, topic, num, crop,
               ans, "B1", topic_id=topic_id)
 
     # ---- idx 0 (printed p3): Q1-Q4 ----
