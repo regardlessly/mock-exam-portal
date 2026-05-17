@@ -220,6 +220,7 @@ h1, h2, h3, h4 { font-weight: 600; }
           <button class="active" id="subjMath" onclick="setSubject('Mathematics')">Mathematics</button>
           <button id="subjSci" onclick="setSubject('Science')">Science</button>
           <button id="subjChi" onclick="setSubject('Chinese')">华文 (Chinese)</button>
+          <button id="subjGeo" onclick="setSubject('Geography')">Geography</button>
         </div>
       </div>
       <br><button class="btn" onclick="loginStudent()">Start</button>
@@ -391,6 +392,7 @@ function setSubject(subj) {
   document.getElementById('subjMath').classList.toggle('active', subj === 'Mathematics');
   document.getElementById('subjSci').classList.toggle('active', subj === 'Science');
   document.getElementById('subjChi').classList.toggle('active', subj === 'Chinese');
+  document.getElementById('subjGeo').classList.toggle('active', subj === 'Geography');
   const label = subj === 'Chinese' ? '华文' : subj;
   document.getElementById('appTitle').textContent = label + ' Practice';
   document.getElementById('appSub').textContent = 'Sec 1 Express ' + label;
@@ -719,7 +721,7 @@ function updatePreviewFor(taId, pvId) {
   const val = ta.value.trim();
   if (!val) { preview.style.display = 'none'; preview.innerHTML = ''; return; }
   preview.style.display = 'block';
-  if (currentSubject === 'Chinese') { preview.textContent = val; return; }
+  if (['Chinese', 'Geography'].includes(currentSubject)) { preview.textContent = val; return; }
   try { preview.innerHTML = katex.renderToString(val, { throwOnError: false, displayMode: false }); }
   catch { preview.textContent = val; }
 }
@@ -944,7 +946,7 @@ async function showProgress() {
 // ── Util ───────────────────────────────────────────────────
 
 function renderMath(el) {
-  if (currentSubject === 'Chinese') return;  // pure CJK text, no KaTeX
+  if (['Chinese', 'Geography'].includes(currentSubject)) return;  // plain text, no KaTeX
   renderMathInElement(el, {
     delimiters: [
       {left: '$$', right: '$$', display: true},

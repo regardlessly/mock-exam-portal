@@ -494,6 +494,30 @@ def ai_mark_answer(question, stem, student_answer, correct_answer, mark_scheme, 
             '只回复一个 JSON 对象（不要 markdown，不要多余文字）：\n'
             '{"score": <0 到 100>, "is_correct": true/false, "feedback": "简短的中文鼓励性评语"}'
         )
+    elif subject == "Geography":
+        prompt = (
+            "You are a STRICT marker for a Secondary 1 Geography exam "
+            "(data-response / structured / source-based answers).\n\n"
+            f"Question: {stem} {question}\n"
+            f"Model answer: {correct_answer}\n"
+            f"Mark scheme: {mark_scheme}\n"
+            f"Total marks: {marks}\n\n"
+            f"Student's answer: {student_answer}\n\n"
+            "MARKING RULES:\n"
+            "- Assess on three dimensions: (1) content accuracy vs the model "
+            "answer, (2) use of geographical data / evidence / examples / case "
+            "studies, (3) correct geographical terminology.\n"
+            "- If the answer is off-topic, factually wrong, or shows no "
+            "geographical understanding, score 0 and is_correct=false.\n"
+            "- Only is_correct=true if the answer covers the key required "
+            "points with correct geographical reasoning.\n"
+            "- Partial credit (score 30-70): some valid points or correct idea "
+            "but missing evidence, terms, or development.\n"
+            "- A vague or generic answer with no geographical substance is 0.\n"
+            "- Be encouraging in feedback but HONEST about what was missing.\n\n"
+            'Respond ONLY with a JSON object (no markdown, no extra text):\n'
+            '{"score": <0 to 100>, "is_correct": true/false, "feedback": "brief encouraging feedback"}'
+        )
     else:
         prompt = (
             f"You are a STRICT marker for a Secondary 1 {subject} exam.\n\n"
@@ -555,6 +579,12 @@ CHINESE_RECOGNITION_PROMPT = (
     "保留原有的标点符号。直接输出文字。"
 )
 
+ENGLISH_TEXT_RECOGNITION_PROMPT = (
+    "Transcribe the handwritten English text in this image exactly. "
+    "Return ONLY the plain text that is written — no explanation, no "
+    "delimiters, no markdown, no LaTeX. Preserve punctuation and line breaks."
+)
+
 
 def _clean_recognised(text):
     """Strip delimiters the model might include (same as math-stylus-support)."""
@@ -572,15 +602,21 @@ def _clean_recognised(text):
 def ai_recognise_handwriting(image_base64, subject="Mathematics"):
     """Recognise handwriting — Gemini Flash (preferred) or Claude Haiku fallback.
 
-    Subject-aware: Chinese uses a Chinese-character OCR prompt; everything
-    else uses the math/LaTeX prompt.
+    Subject-aware: Chinese uses a Chinese-character OCR prompt; Geography uses
+    a plain-English text prompt; everything else uses the math/LaTeX prompt.
+    Plain-text subjects skip the LaTeX-delimiter cleaning step.
     """
     if "," in image_base64:
         image_base64 = image_base64.split(",", 1)[1]
 
     image_bytes = base64.b64decode(image_base64)
-    is_chinese = subject == "Chinese"
-    rec_prompt = CHINESE_RECOGNITION_PROMPT if is_chinese else MATH_RECOGNITION_PROMPT
+    is_plain = subject in ("Chinese", "Geography")
+    if subject == "Chinese":
+        rec_prompt = CHINESE_RECOGNITION_PROMPT
+    elif subject == "Geography":
+        rec_prompt = ENGLISH_TEXT_RECOGNITION_PROMPT
+    else:
+        rec_prompt = MATH_RECOGNITION_PROMPT
 
     # Try Gemini Flash first (free tier)
     api_key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
@@ -594,7 +630,7 @@ def ai_recognise_handwriting(image_base64, subject="Mathematics"):
                 rec_prompt,
             ], generation_config={"max_output_tokens": 1024, "temperature": 0.0})
             text = response.text
-            return text.strip() if is_chinese else _clean_recognised(text)
+            return text.strip() if is_plain else _clean_recognised(text)
         except Exception:
             pass  # Fall through to Claude
 
@@ -609,4 +645,4 @@ def ai_recognise_handwriting(image_base64, subject="Mathematics"):
         }],
         max_tokens=100, temperature=0,
     )
-    return text.strip() if is_chinese else _clean_recognised(text)
+    return text.strip() if is_plain else _clean_recognised(text)

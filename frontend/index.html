@@ -618,6 +618,7 @@ header .nav-row { display: flex; justify-content: space-between; align-items: ce
       <button class="nav-tab active" id="subjMathBtn" onclick="setPortalSubject('Mathematics')">Mathematics</button>
       <button class="nav-tab" id="subjSciBtn" onclick="setPortalSubject('Science')">Science</button>
       <button class="nav-tab" id="subjChiBtn" onclick="setPortalSubject('Chinese')">华文 (Chinese)</button>
+      <button class="nav-tab" id="subjGeoBtn" onclick="setPortalSubject('Geography')">Geography</button>
     </div>
   </div>
   <div class="nav-tabs">
@@ -691,6 +692,7 @@ function setPortalSubject(subj) {
   document.getElementById('subjMathBtn').classList.toggle('active', subj === 'Mathematics');
   document.getElementById('subjSciBtn').classList.toggle('active', subj === 'Science');
   document.getElementById('subjChiBtn').classList.toggle('active', subj === 'Chinese');
+  document.getElementById('subjGeoBtn').classList.toggle('active', subj === 'Geography');
   loadExams();
   loadCurriculum();
   if (document.getElementById('bankSection').style.display !== 'none') loadBankQuestions();
