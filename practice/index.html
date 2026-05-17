@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Math Practice</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
@@ -38,7 +38,7 @@
   --shadow-lg: 0 8px 32px rgba(61,114,232,0.16);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Lexend', sans-serif; font-weight: 400; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; }
+body { font-family: 'Lexend', 'Noto Sans SC', sans-serif; font-weight: 400; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 15px; }
 h1, h2, h3, h4 { font-weight: 600; }
 
 .container { max-width: 800px; margin: 0 auto; padding: 16px; }
@@ -219,6 +219,7 @@ h1, h2, h3, h4 { font-weight: 600; }
         <div class="input-toggle" style="margin:0 auto;display:inline-flex">
           <button class="active" id="subjMath" onclick="setSubject('Mathematics')">Mathematics</button>
           <button id="subjSci" onclick="setSubject('Science')">Science</button>
+          <button id="subjChi" onclick="setSubject('Chinese')">华文 (Chinese)</button>
         </div>
       </div>
       <br><button class="btn" onclick="loginStudent()">Start</button>
@@ -389,8 +390,10 @@ function setSubject(subj) {
   currentSubject = subj;
   document.getElementById('subjMath').classList.toggle('active', subj === 'Mathematics');
   document.getElementById('subjSci').classList.toggle('active', subj === 'Science');
-  document.getElementById('appTitle').textContent = subj + ' Practice';
-  document.getElementById('appSub').textContent = 'Sec 1 Express ' + subj;
+  document.getElementById('subjChi').classList.toggle('active', subj === 'Chinese');
+  const label = subj === 'Chinese' ? '华文' : subj;
+  document.getElementById('appTitle').textContent = label + ' Practice';
+  document.getElementById('appSub').textContent = 'Sec 1 Express ' + label;
 }
 
 function selectStudent(id, name) {
@@ -716,6 +719,7 @@ function updatePreviewFor(taId, pvId) {
   const val = ta.value.trim();
   if (!val) { preview.style.display = 'none'; preview.innerHTML = ''; return; }
   preview.style.display = 'block';
+  if (currentSubject === 'Chinese') { preview.textContent = val; return; }
   try { preview.innerHTML = katex.renderToString(val, { throwOnError: false, displayMode: false }); }
   catch { preview.textContent = val; }
 }
@@ -824,7 +828,7 @@ async function submitPart(partIndex, partId) {
     try {
       const recRes = await fetch(`${API}/api/practice/recognise`, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({image_data: dataUrl}),
+        body: JSON.stringify({image_data: dataUrl, subject: currentSubject}),
       });
       const recData = await recRes.json();
       if (recData.error) {
@@ -940,6 +944,7 @@ async function showProgress() {
 // ── Util ───────────────────────────────────────────────────
 
 function renderMath(el) {
+  if (currentSubject === 'Chinese') return;  // pure CJK text, no KaTeX
   renderMathInElement(el, {
     delimiters: [
       {left: '$$', right: '$$', display: true},

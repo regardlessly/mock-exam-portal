@@ -78,6 +78,7 @@ class FreeAnswer(BaseModel):
 
 class RecogniseRequest(BaseModel):
     image_data: str  # base64 PNG from canvas
+    subject: str = "Mathematics"
 
 
 # ── Student ─────────────────────────────────────────────────
@@ -323,6 +324,11 @@ def check_free_response(req: FreeAnswer, db: Session = Depends(get_db)):
     correct_answer = answer.answer_text if answer else ""
     mark_scheme = answer.mark_scheme if answer else ""
 
+    # Determine subject (Question -> Paper -> Exam) for subject-aware marking
+    subject = "Mathematics"
+    if q.paper and q.paper.exam and q.paper.exam.subject:
+        subject = q.paper.exam.subject
+
     # AI marking via Bedrock
     try:
         result = ai_mark_answer(
@@ -332,6 +338,7 @@ def check_free_response(req: FreeAnswer, db: Session = Depends(get_db)):
             correct_answer=correct_answer,
             mark_scheme=mark_scheme,
             marks=q.marks or 1,
+            subject=subject,
         )
     except Exception as e:
         result = {"score": 0, "feedback": f"AI marking unavailable: {e}", "is_correct": False}
@@ -365,7 +372,7 @@ def check_free_response(req: FreeAnswer, db: Session = Depends(get_db)):
 def recognise_handwriting(req: RecogniseRequest):
     """Send canvas image to Claude Vision to extract math answer."""
     try:
-        result = ai_recognise_handwriting(req.image_data)
+        result = ai_recognise_handwriting(req.image_data, subject=req.subject)
         return {"recognised_text": result}
     except Exception as e:
         # Return error message instead of 500 so frontend can handle it
@@ -465,25 +472,46 @@ def _call_claude(messages, max_tokens=500, temperature=0.1):
     raise RuntimeError(f"No AI backend available. Bedrock error: {bedrock_err}")
 
 
-def ai_mark_answer(question, stem, student_answer, correct_answer, mark_scheme, marks):
-    """Use Claude to mark a free-response answer."""
-    prompt = (
-        "You are a STRICT marker for a Secondary 1 Mathematics exam.\n\n"
-        f"Question: {stem} {question}\n"
-        f"Correct answer: {correct_answer}\n"
-        f"Mark scheme: {mark_scheme}\n"
-        f"Total marks: {marks}\n\n"
-        f"Student's answer: {student_answer}\n\n"
-        "IMPORTANT RULES:\n"
-        "- Compare the student's answer EXACTLY against the correct answer.\n"
-        "- If the student's answer does not match or is mathematically wrong, score 0 and is_correct=false.\n"
-        "- Only give is_correct=true if the answer is mathematically equivalent to the correct answer.\n"
-        "- Partial credit (score 30-70) only if the student shows correct working but makes a minor error.\n"
-        "- An answer of just a random number that doesn't match is score 0.\n"
-        "- Be encouraging in feedback but HONEST about whether it's right or wrong.\n\n"
-        'Respond ONLY with a JSON object (no markdown, no extra text):\n'
-        '{"score": <0 to 100>, "is_correct": true/false, "feedback": "brief encouraging feedback"}'
-    )
+def ai_mark_answer(question, stem, student_answer, correct_answer, mark_scheme, marks,
+                   subject="Mathematics"):
+    """Use Claude to mark a free-response answer (subject-aware)."""
+    if subject == "Chinese":
+        # 中文作文 / 阅读理解 评分 — 评语用中文
+        prompt = (
+            "你是一位严格的新加坡中学一年级（中一）普通华文阅卷老师。\n\n"
+            f"题目：{stem} {question}\n"
+            f"参考答案：{correct_answer}\n"
+            f"评分标准：{mark_scheme}\n"
+            f"满分：{marks}\n\n"
+            f"学生的答案：{student_answer}\n\n"
+            "评分要求：\n"
+            "- 从【内容】【语言】【结构】三方面综合评估学生答案。\n"
+            "- 把学生答案与参考答案严格对照；若答非所问或意思错误，给 0 分，is_correct=false。\n"
+            "- 只有当答案在意思上与参考答案一致、表达通顺时才给 is_correct=true。\n"
+            "- 部分正确（分数 30-70）：要点不全或有语言错误但方向正确。\n"
+            "- 随意作答或与题意无关的答案给 0 分。\n"
+            "- 反馈（feedback）必须用中文，语气鼓励但要诚实指出对错。\n\n"
+            '只回复一个 JSON 对象（不要 markdown，不要多余文字）：\n'
+            '{"score": <0 到 100>, "is_correct": true/false, "feedback": "简短的中文鼓励性评语"}'
+        )
+    else:
+        prompt = (
+            f"You are a STRICT marker for a Secondary 1 {subject} exam.\n\n"
+            f"Question: {stem} {question}\n"
+            f"Correct answer: {correct_answer}\n"
+            f"Mark scheme: {mark_scheme}\n"
+            f"Total marks: {marks}\n\n"
+            f"Student's answer: {student_answer}\n\n"
+            "IMPORTANT RULES:\n"
+            "- Compare the student's answer EXACTLY against the correct answer.\n"
+            "- If the student's answer does not match or is wrong, score 0 and is_correct=false.\n"
+            "- Only give is_correct=true if the answer is equivalent to the correct answer.\n"
+            "- Partial credit (score 30-70) only if the student shows correct working but makes a minor error.\n"
+            "- An answer of just a random value that doesn't match is score 0.\n"
+            "- Be encouraging in feedback but HONEST about whether it's right or wrong.\n\n"
+            'Respond ONLY with a JSON object (no markdown, no extra text):\n'
+            '{"score": <0 to 100>, "is_correct": true/false, "feedback": "brief encouraging feedback"}'
+        )
 
     text = _call_claude(
         [{"role": "user", "content": [{"text": prompt}]}],
@@ -521,6 +549,13 @@ MATH_RECOGNITION_PROMPT = (
 )
 
 
+CHINESE_RECOGNITION_PROMPT = (
+    "请识别这张图片中手写的中文内容。"
+    "只返回识别出的中文文字本身，不要任何解释、标点说明或定界符。"
+    "保留原有的标点符号。直接输出文字。"
+)
+
+
 def _clean_recognised(text):
     """Strip delimiters the model might include (same as math-stylus-support)."""
     import re
@@ -534,14 +569,20 @@ def _clean_recognised(text):
     return text.strip()
 
 
-def ai_recognise_handwriting(image_base64):
-    """Recognise handwritten math — uses Gemini Flash (preferred) or Claude Haiku fallback."""
+def ai_recognise_handwriting(image_base64, subject="Mathematics"):
+    """Recognise handwriting — Gemini Flash (preferred) or Claude Haiku fallback.
+
+    Subject-aware: Chinese uses a Chinese-character OCR prompt; everything
+    else uses the math/LaTeX prompt.
+    """
     if "," in image_base64:
         image_base64 = image_base64.split(",", 1)[1]
 
     image_bytes = base64.b64decode(image_base64)
+    is_chinese = subject == "Chinese"
+    rec_prompt = CHINESE_RECOGNITION_PROMPT if is_chinese else MATH_RECOGNITION_PROMPT
 
-    # Try Gemini Flash first (free tier, optimised for math handwriting)
+    # Try Gemini Flash first (free tier)
     api_key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
     if api_key:
         try:
@@ -550,9 +591,10 @@ def ai_recognise_handwriting(image_base64):
             model = genai.GenerativeModel("gemini-2.5-flash")
             response = model.generate_content([
                 {"mime_type": "image/png", "data": image_bytes},
-                MATH_RECOGNITION_PROMPT,
+                rec_prompt,
             ], generation_config={"max_output_tokens": 1024, "temperature": 0.0})
-            return _clean_recognised(response.text)
+            text = response.text
+            return text.strip() if is_chinese else _clean_recognised(text)
         except Exception:
             pass  # Fall through to Claude
 
@@ -562,9 +604,9 @@ def ai_recognise_handwriting(image_base64):
             "role": "user",
             "content": [
                 {"image": {"format": "png", "source": {"bytes": image_bytes}}},
-                {"text": MATH_RECOGNITION_PROMPT},
+                {"text": rec_prompt},
             ],
         }],
         max_tokens=100, temperature=0,
     )
-    return _clean_recognised(text)
+    return text.strip() if is_chinese else _clean_recognised(text)
