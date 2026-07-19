@@ -426,16 +426,17 @@ def get_progress(student_id: int, db: Session = Depends(get_db)):
 def _call_claude(messages, max_tokens=500, temperature=0.1):
     """Call Claude via Bedrock or Anthropic API, with fallback."""
     # Try Bedrock first
+    bedrock_err_msg = None
     try:
         bedrock = get_bedrock()
         response = bedrock.converse(
-            modelId="anthropic.claude-3-haiku-20240307-v1:0",
+            modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
             messages=messages,
             inferenceConfig={"maxTokens": max_tokens, "temperature": temperature},
         )
         return response["output"]["message"]["content"][0]["text"]
     except Exception as bedrock_err:
-        pass
+        bedrock_err_msg = str(bedrock_err)
 
     # Try Anthropic API
     try:
@@ -461,15 +462,18 @@ def _call_claude(messages, max_tokens=500, temperature=0.1):
             ant_messages.append({"role": m["role"], "content": content})
 
         resp = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-5",
             max_tokens=max_tokens,
             messages=ant_messages,
         )
         return resp.content[0].text
-    except Exception:
-        pass
+    except Exception as anthropic_err:
+        anthropic_err_msg = str(anthropic_err)
 
-    raise RuntimeError(f"No AI backend available. Bedrock error: {bedrock_err}")
+    raise RuntimeError(
+        f"No AI backend available. Bedrock error: {bedrock_err_msg}; "
+        f"Anthropic API error: {anthropic_err_msg}"
+    )
 
 
 def ai_mark_answer(question, stem, student_answer, correct_answer, mark_scheme, marks,
